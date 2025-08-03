@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
+
 import WindowWrapper from './WindowWrapper';
 import SearchBar from './SearchBar';
 import ResultsWindow from './ResultsWindow';
 import { AnimatePresence } from 'framer-motion';
+
 import './App.css';
 
+const messages = ['Type in a search', 'Paste a link', 'drop in a file'];
+
 function App() {
+
   const [results, setResults] = useState([]);
   const [dragging, setDragging] = useState(false);
 
@@ -48,7 +53,26 @@ function App() {
         )}
       </AnimatePresence>
     </WindowWrapper>
+
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIndex((i) => (i + 1) % messages.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="App">
+      <div className="pill-window">
+        <span key={index} className="pill-text">
+          {messages[index]}
+        </span>
+      </div>
+    </div>
   );
 }
 
 export default App;
+

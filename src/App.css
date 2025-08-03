@@ -1,3 +1,4 @@
+
 body {
   background: #0d0d0d;
   margin: 0;
@@ -14,10 +15,28 @@ body {
   background: rgba(35, 29, 25, 0.35);
   backdrop-filter: blur(25px) saturate(160%) contrast(110%);
   -webkit-backdrop-filter: blur(25px) saturate(160%) contrast(110%);
+
+.App {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #0d0d0d;
+}
+
+.pill-window {
+  position: relative;
+  width: 960px;
+  height: 78px;
+  border-radius: 39px;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(20px);
+
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
@@ -64,11 +83,43 @@ body {
   background: transparent;
   border: none;
   outline: none;
+
+}
+
+.pill-window::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 2px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #FE14A8, #1A00FF, #FE14A8);
+  background-size: 200% 100%;
+  animation: borderMove 4s linear infinite;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+}
+
+@keyframes borderMove {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+.pill-text {
+  color: #ffffff;
+  font-size: 24px;
+  animation: fadeText 3s linear infinite;
+
 }
 
 @keyframes fadeText {
   0% {
     opacity: 0;
+
   }
   10% {
     opacity: 1;
@@ -79,10 +130,23 @@ body {
   50% {
     opacity: 0;
   }
+=======
+  }
+  10% {
+    opacity: 1;
+  }
+  40% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+
   100% {
     opacity: 0;
   }
 }
+
 
 .results-window {
   position: absolute;
@@ -161,3 +225,4 @@ body {
   border-radius: 4px;
   font-size: 12px;
 }
+
