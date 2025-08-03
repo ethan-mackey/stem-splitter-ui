@@ -14,6 +14,10 @@ Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 The page will reload when you make changes.\
 You may also see any lint errors in the console.
 
+### `npm run electron-dev`
+
+Launches an Electron window and the React development server. The app will automatically load in the desktop window once the development server is ready.
+
 ### `npm test`
 
 Launches the test runner in the interactive watch mode.\
