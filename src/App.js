@@ -23,7 +23,6 @@ export default function App() {
     return () => window.removeEventListener("mouseup", handleUp);
   }, []);
 
-  /* ---------- placeholder text dissolve ---------- */
   useEffect(() => {
     const id = setInterval(
       () => setIndex((i) => (i + 1) % messages.length),
@@ -34,7 +33,7 @@ export default function App() {
 
   /* ---------- YouTube search ---------- */
   const handleSearch = async (term) => {
-    const apiKey = import.meta.env.VITE_YT_API_KEY; // ← CRA: process.env.REACT_APP_…
+    const apiKey = process.env.REACT_APP_YT_API_KEY; // ← CRA: process.env.REACT_APP_…
     if (!term || !apiKey) return;
 
     // 1) search for 8 videos
