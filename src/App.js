@@ -34,21 +34,30 @@ export default function App() {
   /* ---------- YouTube search ---------- */
   const handleSearch = async (term) => {
     const apiKey = process.env.REACT_APP_YT_API_KEY; // ← CRA: process.env.REACT_APP_…
-    if (!term || !apiKey) return;
+    if (!term) return;
+
+    const keyParam = apiKey ? `&key=${apiKey}` : "";
 
     // 1) search for 8 videos
     const searchUrl =
       `https://www.googleapis.com/youtube/v3/search` +
       `?part=snippet&maxResults=8&type=video&q=${encodeURIComponent(term)}` +
-      `&key=${apiKey}`;
-    const { items } = await (await fetch(searchUrl)).json();
+      keyParam;
+    const searchRes = await fetch(searchUrl);
+    const { items: searchItems = [] } = await searchRes.json();
+    if (searchItems.length === 0) {
+      setResults([]);
+      return;
+    }
 
     // 2) get their durations
-    const ids = items.map((i) => i.id.videoId).join(",");
+    const ids = searchItems.map((i) => i.id.videoId).join(",");
     const detailsUrl =
       `https://www.googleapis.com/youtube/v3/videos` +
-      `?part=contentDetails&id=${ids}&key=${apiKey}`;
-    const { items: details } = await (await fetch(detailsUrl)).json();
+      `?part=contentDetails&id=${ids}` +
+      keyParam;
+    const detailsRes = await fetch(detailsUrl);
+    const { items: details = [] } = await detailsRes.json();
 
     const durationMap = Object.fromEntries(
       details.map((d) => [d.id, d.contentDetails.duration])
@@ -56,7 +65,7 @@ export default function App() {
 
     // 3) map to UI-friendly objects
     setResults(
-      items.map((item) => ({
+      searchItems.map((item) => ({
         id: item.id.videoId,
         title: item.snippet.title,
         thumbnail: item.snippet.thumbnails.medium.url,
