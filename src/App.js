@@ -1,26 +1,24 @@
-// App.jsx
+// App.js
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 
 import WindowWrapper from "./WindowWrapper";
 import SearchBar from "./SearchBar";
 import ResultsWindow from "./ResultsWindow";
-
 import "./App.css";
 
 const messages = ["Type in a search", "Paste a link", "Drop in a file"];
+const PANEL_HEIGHT = 540; // keep in one place
 
 export default function App() {
-  /* ---------------- state ---------------- */
   const [results, setResults] = useState([]);
   const [dragging, setDragging] = useState(false);
-  const [index, setIndex] = useState(0); // rotating placeholder
+  const [index, setIndex] = useState(0);
 
-  /* ---------- window-drag bookkeeping ---------- */
   useEffect(() => {
-    const handleUp = () => setDragging(false);
-    window.addEventListener("mouseup", handleUp);
-    return () => window.removeEventListener("mouseup", handleUp);
+    const up = () => setDragging(false);
+    window.addEventListener("mouseup", up);
+    return () => window.removeEventListener("mouseup", up);
   }, []);
 
   useEffect(() => {
@@ -31,41 +29,42 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  /* ---------- YouTube search ---------- */
+  // Grow/shrink the outer Electron window when results appear/disappear
+  useEffect(() => {
+    if (results.length > 0) {
+      window.electronAPI?.resultsOpened(PANEL_HEIGHT);
+    } else {
+      window.electronAPI?.resultsClosed();
+    }
+  }, [results.length]);
+
   const handleSearch = async (term) => {
-    const apiKey = process.env.REACT_APP_YT_API_KEY; // ← CRA: process.env.REACT_APP_…
+    const apiKey = process.env.REACT_APP_YT_API_KEY; // CRA style
     if (!term) return;
 
-    const keyParam = apiKey ? `&key=${apiKey}` : "";
-
-    // 1) search for 8 videos
+    const base = "https://www.googleapis.com/youtube/v3";
     const searchUrl =
-      `https://www.googleapis.com/youtube/v3/search` +
-      `?part=snippet&maxResults=8&type=video&q=${encodeURIComponent(term)}` +
-      keyParam;
-    const searchRes = await fetch(searchUrl);
-    const { items: searchItems = [] } = await searchRes.json();
-    if (searchItems.length === 0) {
+      `${base}/search?part=snippet&maxResults=8&type=video&q=${encodeURIComponent(
+        term
+      )}` + (apiKey ? `&key=${apiKey}` : "");
+    const searchJson = await (await fetch(searchUrl)).json();
+    const items = searchJson.items || [];
+    if (items.length === 0) {
       setResults([]);
       return;
     }
 
-    // 2) get their durations
-    const ids = searchItems.map((i) => i.id.videoId).join(",");
+    const ids = items.map((i) => i.id.videoId).join(",");
     const detailsUrl =
-      `https://www.googleapis.com/youtube/v3/videos` +
-      `?part=contentDetails&id=${ids}` +
-      keyParam;
-    const detailsRes = await fetch(detailsUrl);
-    const { items: details = [] } = await detailsRes.json();
-
+      `${base}/videos?part=contentDetails&id=${ids}` +
+      (apiKey ? `&key=${apiKey}` : "");
+    const { items: details = [] } = await (await fetch(detailsUrl)).json();
     const durationMap = Object.fromEntries(
       details.map((d) => [d.id, d.contentDetails.duration])
     );
 
-    // 3) map to UI-friendly objects
     setResults(
-      searchItems.map((item) => ({
+      items.map((item) => ({
         id: item.id.videoId,
         title: item.snippet.title,
         thumbnail: item.snippet.thumbnails.medium.url,
@@ -75,20 +74,21 @@ export default function App() {
     );
   };
 
-  /* ---------------- render ---------------- */
   return (
     <WindowWrapper onMouseDown={() => setDragging(true)}>
-      {/* SEARCH BAR WITH CYCLING PLACEHOLDER */}
       <SearchBar onSearch={handleSearch}>
         <span key={index} className="pill-text">
           {messages[index]}
         </span>
       </SearchBar>
 
-      {/* RESULTS */}
       <AnimatePresence>
         {results.length > 0 && (
-          <ResultsWindow results={results} disablePointerEvents={dragging} />
+          <ResultsWindow
+            results={results}
+            disablePointerEvents={dragging}
+            panelHeight={PANEL_HEIGHT}
+          />
         )}
       </AnimatePresence>
     </WindowWrapper>

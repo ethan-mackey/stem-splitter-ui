@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
-import './App.css';
+import { useEffect, useState } from "react";
+import "./App.css";
 
-const messages = ['Type in a search', 'Paste a link', 'drop in a file'];
+const messages = ["Type in a search", "Paste a link", "drop in a file"];
 
 function SearchBar({ onSearch }) {
   const [index, setIndex] = useState(0);
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState("");
   const [focused, setFocused] = useState(false);
 
   useEffect(() => {
@@ -16,13 +16,15 @@ function SearchBar({ onSearch }) {
   }, []);
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      onSearch(value);
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const trimmed = value.trim();
+      if (trimmed) onSearch(trimmed);
     }
   };
 
   return (
-    <div className="pill-window" style={{ WebkitAppRegion: 'no-drag' }}>
+    <div className="pill-window" style={{ WebkitAppRegion: "no-drag" }}>
       {!value && !focused && (
         <span key={index} className="pill-text">
           {messages[index]}
@@ -35,7 +37,7 @@ function SearchBar({ onSearch }) {
         onKeyDown={handleKeyDown}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        style={{ WebkitAppRegion: 'no-drag' }}
+        style={{ WebkitAppRegion: "no-drag" }}
       />
     </div>
   );
