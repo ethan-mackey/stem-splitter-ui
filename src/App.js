@@ -5,15 +5,18 @@ import { AnimatePresence } from "framer-motion";
 import WindowWrapper from "./WindowWrapper";
 import SearchBar from "./SearchBar";
 import ResultsWindow from "./ResultsWindow";
+import DashboardView from "./DashboardView";
 import "./App.css";
 
 const messages = ["Type in a search", "Paste a link", "Drop in a file"];
 const PANEL_HEIGHT = 540; // keep in one place
+const DASHBOARD_HEIGHT = 640;
 
 export default function App() {
   const [results, setResults] = useState([]);
   const [dragging, setDragging] = useState(false);
   const [index, setIndex] = useState(0);
+  const [selected, setSelected] = useState(null);
 
   useEffect(() => {
     const up = () => setDragging(false);
@@ -29,14 +32,16 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  // Grow/shrink the outer Electron window when results appear/disappear
+  // Grow/shrink the outer Electron window when panels change
   useEffect(() => {
-    if (results.length > 0) {
+    if (selected) {
+      window.electronAPI?.resultsOpened(DASHBOARD_HEIGHT);
+    } else if (results.length > 0) {
       window.electronAPI?.resultsOpened(PANEL_HEIGHT);
     } else {
       window.electronAPI?.resultsClosed();
     }
-  }, [results.length]);
+  }, [results.length, selected]);
 
   const handleSearch = async (term) => {
     const apiKey = process.env.REACT_APP_YT_API_KEY; // CRA style
@@ -76,21 +81,27 @@ export default function App() {
 
   return (
     <WindowWrapper onMouseDown={() => setDragging(true)}>
-      <SearchBar onSearch={handleSearch}>
-        <span key={index} className="pill-text">
-          {messages[index]}
-        </span>
-      </SearchBar>
+      {selected ? (
+        <DashboardView video={selected} onBack={() => setSelected(null)} />
+      ) : (
+        <>
+          <SearchBar onSearch={handleSearch}>
+            <span key={index} className="pill-text">
+              {messages[index]}
+            </span>
+          </SearchBar>
 
-      <AnimatePresence>
-        {results.length > 0 && (
-          <ResultsWindow
-            results={results}
-            disablePointerEvents={dragging}
-            panelHeight={PANEL_HEIGHT}
-          />
-        )}
-      </AnimatePresence>
+          <AnimatePresence>
+            {results.length > 0 && (
+              <ResultsWindow
+                results={results}
+                disablePointerEvents={dragging}
+                onSelect={(v) => setSelected(v)}
+              />
+            )}
+          </AnimatePresence>
+        </>
+      )}
     </WindowWrapper>
   );
 }

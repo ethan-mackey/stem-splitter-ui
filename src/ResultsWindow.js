@@ -4,7 +4,7 @@ import "./App.css";
 
 const spring = { type: "spring", stiffness: 260, damping: 22, mass: 0.8 };
 
-function ResultsWindow({ results, disablePointerEvents }) {
+function ResultsWindow({ results, disablePointerEvents, onSelect }) {
   return (
     <motion.div
       className="results-window"
@@ -12,6 +12,7 @@ function ResultsWindow({ results, disablePointerEvents }) {
       animate={{ height: 540, opacity: 1, y: 0 }}
       exit={{ height: 0, opacity: 0, y: -20 }}
       transition={{ type: "spring", stiffness: 260, damping: 22, mass: 0.8 }}
+      style={{ pointerEvents: disablePointerEvents ? "none" : "auto" }}
     >
       <motion.div
         className="results-grid"
@@ -21,7 +22,7 @@ function ResultsWindow({ results, disablePointerEvents }) {
         style={{ WebkitAppRegion: "no-drag" }}
       >
         {results.map((video) => (
-          <VideoCard key={video.id} video={video} />
+          <VideoCard key={video.id} video={video} onSelect={onSelect} />
         ))}
       </motion.div>
     </motion.div>
