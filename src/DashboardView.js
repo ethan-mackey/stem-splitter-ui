@@ -1,336 +1,208 @@
+// DashboardView.js
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import YouTubePlayer from "./YoutubePlayer";
 import Waveform from "./Waveform";
 import "./App.css";
 
-const spring = { type: "spring", stiffness: 260, damping: 22, mass: 0.8 };
-
 export default function DashboardView({ video, onBack }) {
+  /* ---------- hooks (must run every render) ---------- */
   const ytRef = useRef(null);
-
-  const [isReady, setIsReady] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(80);
-  const [rate, setRate] = useState(1);
-  const [loop, setLoop] = useState(null); // {a, b}
-  const [markers, setMarkers] = useState([
-    { id: "m1", t: 10, label: "Cue A" },
-    { id: "m2", t: 22, label: "Drop" },
-  ]);
+  const [loop, setLoop] = useState(null);
+  const [markers, setMarkers] = useState([]);
   const [stems, setStems] = useState({
     vocals: true,
-    drums: true,
-    bass: true,
-    other: true,
+    piano: false,
+    guitar: false,
+    bass: false,
+    drums: false,
+    other: false,
   });
 
-  const videoId = video.id;
+  /* ---------- early guard ---------- */
+  if (!video) return null;
+
+  /* ---------- helpers ---------- */
+  const volume = 80;
+  const rate = 1;
   const progress = duration ? Math.min(1, current / duration) : 0;
+  const seek = (s) => ytRef.current?.seek(Math.max(0, Math.min(duration, s)));
 
-  const togglePlay = () => {
-    if (!isReady) return;
-    setPlaying((p) => {
-      const next = !p;
-      if (next) ytRef.current?.play();
-      else ytRef.current?.pause();
-      return next;
-    });
-  };
-
-  const onPlayerReady = (_e, info) => {
-    setDuration(info.duration || ytRef.current?.getDuration() || 0);
-    setIsReady(true);
-  };
-
-  const onPlayerState = (e) => {
-    // 1: playing, 2: paused, 0: ended
-    if (e.data === 1) setPlaying(true);
-    if (e.data === 2 || e.data === 0) setPlaying(false);
-  };
-
-  const onTime = (t, d) => {
-    setCurrent(t);
-    if (d && d !== duration) setDuration(d);
-    // loop: when playhead reaches the end of loop, jump back to A
-    if (loop?.a != null && loop?.b != null) {
-      const a = Math.min(loop.a, loop.b);
-      const b = Math.max(loop.a, loop.b);
-      if (t >= b) ytRef.current?.seek(a);
-    }
-  };
-
-  const handleScrub = (ratio) => {
-    const t = ratio * duration;
-    ytRef.current?.seek(t);
-    setCurrent(t);
-  };
-
-  const addMarker = (t) => {
-    const id = Math.random().toString(36).slice(2, 9);
-    setMarkers((m) => [...m, { id, t, label: `M${m.length + 1}` }]);
-  };
-
-  const moveMarker = (id, t) => {
-    setMarkers((m) => m.map((mk) => (mk.id === id ? { ...mk, t } : mk)));
-  };
-
-  const removeMarker = (id) => {
-    setMarkers((m) => m.filter((mk) => mk.id !== id));
-  };
-
-  const setLoopAroundCurrent = () => {
-    const span = 4;
-    setLoop({
-      a: Math.max(0, current - span / 2),
-      b: Math.min(duration, current + span / 2),
-    });
-  };
-
-  const clearLoop = () => setLoop(null);
-
-  const toggleStem = (key) => setStems((s) => ({ ...s, [key]: !s[key] }));
-
-  const exportMix = (type) => {
-    // Stubs for now. Replace with your export pipeline/IPC.
-    console.log("Export:", type, { stems, markers, loop, rate });
-    alert(`Export queued: ${type}`);
-  };
-
+  /* ---------- render ---------- */
   return (
     <motion.div
       className="dashboard"
-      initial={{ opacity: 0, y: 24, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 24, scale: 0.98 }}
-      transition={spring}
-      style={{ WebkitAppRegion: "no-drag" }}
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.1 }}
     >
-      {/* Hidden controller for YouTube audio */}
-      <YouTubePlayer
-        ref={ytRef}
-        videoId={videoId}
-        onReady={onPlayerReady}
-        onStateChange={onPlayerState}
-        onTime={onTime}
-        volume={volume}
-        playbackRate={rate}
-      />
-
-      {/* Left rail */}
-      <div className="dash-rail">
-        <button className="rail-item active" title="Project">
-          🏠
-        </button>
-        <button
-          className={`rail-item ${stems.vocals ? "on" : ""}`}
-          onClick={() => toggleStem("vocals")}
-          title="Vocals"
-        >
-          🎤
-        </button>
-        <button
-          className={`rail-item ${stems.drums ? "on" : ""}`}
-          onClick={() => toggleStem("drums")}
-          title="Drums"
-        >
-          🥁
-        </button>
-        <button
-          className={`rail-item ${stems.bass ? "on" : ""}`}
-          onClick={() => toggleStem("bass")}
-          title="Bass"
-        >
-          🎸
-        </button>
-        <button
-          className={`rail-item ${stems.other ? "on" : ""}`}
-          onClick={() => toggleStem("other")}
-          title="Other"
-        >
-          🎛️
-        </button>
-        <div className="rail-spacer" />
-        <button
-          className="rail-item"
-          title="Export"
-          onClick={() => exportMix("mixdown")}
-        >
-          📤
+      {/* ---- header bar ---- */}
+      <div className="dash-header">
+        <img src={video.thumbnail} className="dash-thumbnail" alt="" />
+        <div className="dash-info">
+          <h2 className="dash-title">DANI CALIFORNIA</h2>
+          <p className="dash-artist">Red Hot Chili Peppers</p>
+        </div>
+        <button className="dash-close" onClick={onBack}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M18 6L6 18M6 6l12 12"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
         </button>
       </div>
 
-      {/* Header */}
-      <div className="dash-header">
-        <button className="ghost" onClick={onBack}>
-          ← Results
-        </button>
-        <div className="dash-title">
-          <img src={video.thumbnail} alt="" className="dash-thumb" />
-          <div className="dash-title-text">
-            <div className="dash-title-name" title={video.title}>
-              {video.title}
-            </div>
-            <div className="dash-title-sub">
-              {formatDurationIso(video.duration)} • YouTube
+      {/* ---- main content ---- */}
+      <div className="dash-content">
+        {/* Left sidebar container */}
+        <div className="dash-sidebar">
+          {/* Left side controls */}
+          <div className="dash-controls">
+            <select className="dash-select" defaultValue="">
+              <option value="" disabled>
+                Select audio format
+              </option>
+              <option>WAV</option>
+              <option>AIFF</option>
+              <option>MP3</option>
+            </select>
+
+            <select className="dash-select" defaultValue="">
+              <option value="" disabled>
+                Select AI Model
+              </option>
+              <option>HT Demucs v4</option>
+              <option>MDXNet HQ</option>
+            </select>
+
+            <div className="stem-list">
+              {Object.entries(stems).map(([k, v]) => (
+                <div
+                  key={k}
+                  className={`stem-item ${v ? "active" : ""}`}
+                  onClick={() => setStems((s) => ({ ...s, [k]: !v }))}
+                >
+                  <span className="stem-dot" />
+                  <span className="stem-label">
+                    {k.charAt(0).toUpperCase() + k.slice(1)}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
+
+          {/* Split button at bottom of sidebar */}
+          <button className="split-audio-btn">SPLIT AUDIO</button>
         </div>
-        <div className="dash-header-actions">
-          <select
-            className="ghost"
-            value={rate}
-            onChange={(e) => setRate(Number(e.target.value))}
-            title="Playback rate"
-          >
-            <option value={0.5}>0.5x</option>
-            <option value={0.75}>0.75x</option>
-            <option value={1}>1.0x</option>
-            <option value={1.25}>1.25x</option>
-            <option value={1.5}>1.5x</option>
-            <option value={2}>2.0x</option>
-          </select>
-          <input
-            className="vol"
-            type="range"
-            min="0"
-            max="100"
-            value={volume}
-            onChange={(e) => setVolume(Number(e.target.value))}
-            title="Volume"
+
+        {/* Right side waveform */}
+        <div className="dash-waveform-container">
+          <div className="waveform-time-left">{formatTime(current)}</div>
+          <Waveform
+            progress={progress}
+            markers={markers}
+            duration={duration}
+            loop={loop}
+            onScrub={(r) => seek(r * duration)}
+            onMarkerAdd={(t) =>
+              setMarkers((m) => [...m, { id: crypto.randomUUID(), t }])
+            }
+            onMarkerMove={(id, t) =>
+              setMarkers((m) => m.map((o) => (o.id === id ? { ...o, t } : o)))
+            }
+            onMarkerRemove={(id) =>
+              setMarkers((m) => m.filter((o) => o.id !== id))
+            }
+            onLoopChange={setLoop}
           />
+          <div className="waveform-time-right">{formatTime(duration)}</div>
+
+          {/* Transport controls */}
+          <div className="dash-transport">
+            <button className="transport-btn" onClick={() => seek(current - 5)}>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path d="M4 5v10l3.5-2.5L11 10l-3.5-2.5L4 5zm7 0v10l3.5-2.5L18 10l-3.5-2.5L11 5z" />
+              </svg>
+            </button>
+            <button
+              className="transport-btn play"
+              onClick={() =>
+                playing ? ytRef.current?.pause() : ytRef.current?.play()
+              }
+            >
+              {playing ? (
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <rect x="6" y="4" width="4" height="16" rx="1" />
+                  <rect x="14" y="4" width="4" height="16" rx="1" />
+                </svg>
+              ) : (
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
+            </button>
+            <button className="transport-btn" onClick={() => seek(current + 5)}>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path d="M16 15V5l-3.5 2.5L9 10l3.5 2.5L16 15zm-7 0V5l-3.5 2.5L2 10l3.5 2.5L9 15z" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Waveform + callouts */}
-      <div className="dash-main">
-        <Waveform
-          progress={progress}
-          markers={markers}
-          duration={duration}
-          loop={loop}
-          onScrub={handleScrub}
-          onMarkerAdd={addMarker}
-          onMarkerMove={moveMarker}
-          onMarkerRemove={removeMarker}
-          onLoopChange={setLoop}
-        />
-        <div className="callouts">
-          <Callout text="Drag markers to refine cues. Double-click to add/remove." />
-          <Callout text="Use A/B handles to loop a region." />
-          <Callout text="Playback speed and volume are in the header." />
-        </div>
-      </div>
-
-      {/* Transport */}
-      <div className="dash-transport">
-        <div className="transport-left">
-          <button
-            className="circle"
-            onClick={() => ytRef.current?.seek(Math.max(0, current - 5))}
-            title="Back 5s"
-          >
-            ⏪
-          </button>
-          <button
-            className="primary circle"
-            onClick={togglePlay}
-            title="Space to toggle"
-          >
-            {playing ? "⏸" : "▶️"}
-          </button>
-          <button
-            className="circle"
-            onClick={() => ytRef.current?.seek(Math.min(duration, current + 5))}
-            title="Forward 5s"
-          >
-            ⏩
-          </button>
-          <button
-            className="ghost"
-            onClick={setLoopAroundCurrent}
-            title="Set loop around playhead"
-          >
-            A/B
-          </button>
-          <button className="ghost" onClick={clearLoop} title="Clear loop">
-            Clear
-          </button>
-        </div>
-        <div className="timecode">
-          {formatTime(current)} / {formatTime(duration)}
-        </div>
-        <div className="transport-right">
-          <button className="ghost" onClick={() => exportMix("markers-json")}>
-            Export Markers
-          </button>
-          <button
-            className="ghost"
-            onClick={() => exportMix("audio-selection")}
-          >
-            Export Loop
-          </button>
-        </div>
-      </div>
-
-      {/* Right info */}
-      <div className="dash-right">
-        <Info title="Detected Sources" body={listFromStems(stems)} />
-        <Info
-          title="Hints"
-          body="Click the waveform to seek. Use A/B to loop a tricky passage."
-        />
-        <Info
-          title="Shortcuts"
-          body="Space: Play/Pause • A/B: Loop • ←/→: Seek 5s"
-        />
-      </div>
+      {/* Hidden YouTube player */}
+      <YouTubePlayer
+        ref={ytRef}
+        videoId={video.id}
+        volume={volume}
+        playbackRate={rate}
+        onReady={(_, i) =>
+          setDuration(i.duration || ytRef.current?.getDuration() || 0)
+        }
+        onStateChange={(e) =>
+          setPlaying(
+            e.data === 1 ? true : e.data === 0 || e.data === 2 ? false : playing
+          )
+        }
+        onTime={(t, d) => {
+          setCurrent(t);
+          if (d && d !== duration) setDuration(d);
+          if (loop?.a != null && loop?.b != null && t >= loop.b) seek(loop.a);
+        }}
+      />
     </motion.div>
   );
 }
 
-function Callout({ text }) {
-  return <div className="note tiny">{text}</div>;
-}
-
-function Info({ title, body }) {
-  return (
-    <div className="note">
-      <div className="note-title">{title}</div>
-      <div className="note-body">{body}</div>
-    </div>
-  );
-}
-
-function listFromStems(s) {
-  const on = Object.entries(s)
-    .filter(([, v]) => v)
-    .map(([k]) => k[0].toUpperCase() + k.slice(1))
-    .join(", ");
-  return on || "None selected";
-}
-
-function formatTime(sec) {
-  if (!Number.isFinite(sec)) return "0:00";
-  const s = Math.floor(sec % 60)
-    .toString()
-    .padStart(2, "0");
-  const m = Math.floor(sec / 60);
-  return `${m}:${s}`;
-}
-
-function formatDurationIso(iso) {
-  if (!iso) return "";
-  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-  if (!m) return "";
-  const h = parseInt(m[1] || 0, 10);
-  const mm = parseInt(m[2] || 0, 10);
-  const s = parseInt(m[3] || 0, 10);
-  const parts = [];
-  if (h) parts.push(h);
-  parts.push(h ? String(mm).padStart(2, "0") : mm);
-  parts.push(String(s).padStart(2, "0"));
-  return parts.join(":");
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }

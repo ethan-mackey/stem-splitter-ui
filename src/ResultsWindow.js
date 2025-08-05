@@ -4,21 +4,22 @@ import "./App.css";
 
 const spring = { type: "spring", stiffness: 260, damping: 22, mass: 0.8 };
 
-function ResultsWindow({ results, disablePointerEvents, onSelect }) {
+export default function ResultsWindow({ results, onSelect }) {
+  if (!results?.length) return null;
+
   return (
     <motion.div
       className="results-window"
       initial={{ height: 0, opacity: 0, y: -20 }}
       animate={{ height: 540, opacity: 1, y: 0 }}
       exit={{ height: 0, opacity: 0, y: -20 }}
-      transition={{ type: "spring", stiffness: 260, damping: 22, mass: 0.8 }}
-      style={{ pointerEvents: disablePointerEvents ? "none" : "auto" }}
+      transition={spring}
     >
       <motion.div
         className="results-grid"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.2 }}
+        transition={{ delay: 0.25 }}
         style={{ WebkitAppRegion: "no-drag" }}
       >
         {results.map((video) => (
@@ -28,5 +29,3 @@ function ResultsWindow({ results, disablePointerEvents, onSelect }) {
     </motion.div>
   );
 }
-
-export default ResultsWindow;

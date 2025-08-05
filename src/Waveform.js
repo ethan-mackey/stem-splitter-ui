@@ -4,30 +4,56 @@ import "./App.css";
 
 export default function Waveform({
   progress = 0,
-  markers = [],
   duration = 0,
-  loop = null, // {a: sec, b: sec} or null
+  loop = null,
   onScrub,
-  onMarkerAdd,
-  onMarkerMove,
-  onMarkerRemove,
   onLoopChange,
 }) {
   const ref = useRef(null);
-  const [drag, setDrag] = useState(null); // {type: 'marker'|'loop-a'|'loop-b', id?}
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragType, setDragType] = useState(null); // 'scrub', 'start', 'end'
 
   const shape = useMemo(() => {
-    const W = 740,
-      H = 180,
-      mid = H / 2;
-    const steps = 220;
+    const W = 740;
+    const H = 180;
+    const mid = H / 2;
+    const steps = 200;
     let d = `M 0 ${mid}`;
+
+    // Generate more realistic waveform pattern
     for (let i = 0; i <= steps; i++) {
       const x = (i / steps) * W;
-      const amp = 48 * Math.sin(i / 2.2) + 24 * Math.cos(i / 3.7);
-      const y = mid - Math.abs(amp) * (0.65 + 0.1 * Math.sin(i / 5));
+      const t = i / steps;
+
+      // Create varying amplitude
+      const amp1 = 35 * Math.sin(t * Math.PI * 8 + 1);
+      const amp2 = 25 * Math.sin(t * Math.PI * 12 + 2);
+      const amp3 = 15 * Math.sin(t * Math.PI * 20 + 3);
+      const envelope = Math.sin(t * Math.PI) * 0.8 + 0.2;
+
+      const amplitude = (amp1 + amp2 + amp3) * envelope;
+      const y = mid - Math.abs(amplitude);
+
       d += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
     }
+
+    // Mirror for bottom half
+    for (let i = steps; i >= 0; i--) {
+      const x = (i / steps) * W;
+      const t = i / steps;
+
+      const amp1 = 35 * Math.sin(t * Math.PI * 8 + 1);
+      const amp2 = 25 * Math.sin(t * Math.PI * 12 + 2);
+      const amp3 = 15 * Math.sin(t * Math.PI * 20 + 3);
+      const envelope = Math.sin(t * Math.PI) * 0.8 + 0.2;
+
+      const amplitude = (amp1 + amp2 + amp3) * envelope;
+      const y = mid + Math.abs(amplitude);
+
+      d += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
+    }
+
+    d += " Z";
     return { d, W, H, mid };
   }, []);
 
@@ -38,172 +64,130 @@ export default function Waveform({
     return x / box.width;
   };
 
-  const secToX = (s) => (shape.W * s) / Math.max(duration, 0.0001);
+  const handleMouseDown = (e, type) => {
+    e.preventDefault();
+    setIsDragging(true);
+    setDragType(type);
 
-  const onDown = (e) => {
-    const type = e.target.dataset.type;
-    if (type === "marker") {
-      setDrag({ type: "marker", id: e.target.dataset.id });
-    } else if (type === "loop-a" || type === "loop-b") {
-      setDrag({ type });
-    } else if (e.detail === 2) {
-      // double click to add marker at cursor
+    if (type === "scrub") {
       const r = toRatio(e.clientX);
-      onMarkerAdd?.(r * duration);
-    } else {
-      onScrub?.(toRatio(e.clientX));
+      onScrub?.(r);
     }
   };
 
-  const onMove = (e) => {
-    if (!drag) return;
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+
     const r = toRatio(e.clientX);
-    const t = r * duration;
-    if (drag.type === "marker") onMarkerMove?.(drag.id, t);
-    if (drag.type === "loop-a") onLoopChange?.({ ...loop, a: t });
-    if (drag.type === "loop-b") onLoopChange?.({ ...loop, b: t });
+
+    if (dragType === "scrub") {
+      onScrub?.(r);
+    } else if (dragType === "start" || dragType === "end") {
+      const t = r * duration;
+      if (dragType === "start") {
+        onLoopChange?.({ ...loop, a: t });
+      } else {
+        onLoopChange?.({ ...loop, b: t });
+      }
+    }
   };
 
-  const onUp = () => setDrag(null);
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setDragType(null);
+  };
 
-  const aX = loop?.a != null ? secToX(loop.a) : null;
-  const bX = loop?.b != null ? secToX(loop.b) : null;
-  const left = aX != null && bX != null ? Math.min(aX, bX) : null;
-  const right = aX != null && bX != null ? Math.max(aX, bX) : null;
+  const startPos = (loop?.a ?? 0) / duration;
+  const endPos = (loop?.b ?? 1) / duration;
 
   return (
     <div
-      className="wave-wrap"
+      className="waveform-wrapper"
       ref={ref}
-      onMouseDown={onDown}
-      onMouseMove={onMove}
-      onMouseUp={onUp}
-      onMouseLeave={onUp}
-      title="Double-click to add marker. Drag markers or loop handles. Click to scrub."
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
     >
       <svg
-        className="wave-svg"
+        className="waveform-svg"
         viewBox={`0 0 ${shape.W} ${shape.H}`}
         preserveAspectRatio="none"
       >
         <defs>
-          <linearGradient id="wf-grad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#f0abfc" />
-            <stop offset="50%" stopColor="#a78bfa" />
-            <stop offset="100%" stopColor="#7c3aed" />
+          <linearGradient
+            id="waveform-gradient"
+            x1="0%"
+            y1="0%"
+            x2="0%"
+            y2="100%"
+          >
+            <stop offset="0%" stopColor="#ff0a9c" stopOpacity="0.9" />
+            <stop offset="50%" stopColor="#c026d3" stopOpacity="1" />
+            <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.9" />
           </linearGradient>
-          <clipPath id="wf-cut">
+
+          <clipPath id="progress-clip">
             <rect x="0" y="0" width={shape.W * progress} height={shape.H} />
           </clipPath>
+
+          <mask id="loop-mask">
+            <rect x="0" y="0" width={shape.W} height={shape.H} fill="white" />
+            <rect
+              x={shape.W * startPos}
+              y="0"
+              width={shape.W * (endPos - startPos)}
+              height={shape.H}
+              fill="black"
+            />
+          </mask>
         </defs>
 
-        {/* base */}
-        <path d={shape.d} fill="none" stroke="#2b2147" strokeWidth="4" />
-        {/* played */}
+        {/* Background waveform */}
+        <path d={shape.d} fill="rgba(255,255,255,0.1)" stroke="none" />
+
+        {/* Progress waveform */}
         <path
           d={shape.d}
-          fill="none"
-          stroke="url(#wf-grad)"
-          strokeWidth="4"
-          clipPath="url(#wf-cut)"
+          fill="url(#waveform-gradient)"
+          stroke="none"
+          clipPath="url(#progress-clip)"
         />
 
-        {/* loop region */}
-        {left != null && right != null && (
-          <rect
-            x={left}
-            y="0"
-            width={Math.max(2, right - left)}
-            height={shape.H}
-            fill="rgba(124,58,237,0.18)"
-            stroke="rgba(124,58,237,0.5)"
-            strokeWidth="1"
-            rx="4"
-          />
-        )}
-
-        {/* loop handles */}
-        {aX != null && (
-          <g transform={`translate(${aX},0)`}>
-            <rect
-              x="-4"
-              y="0"
-              width="8"
-              height={shape.H}
-              rx="2"
-              fill="#7c3aed"
-              data-type="loop-a"
-              style={{ cursor: "ew-resize" }}
-            />
-          </g>
-        )}
-        {bX != null && (
-          <g transform={`translate(${bX},0)`}>
-            <rect
-              x="-4"
-              y="0"
-              width="8"
-              height={shape.H}
-              rx="2"
-              fill="#7c3aed"
-              data-type="loop-b"
-              style={{ cursor: "ew-resize" }}
-            />
-          </g>
-        )}
-
-        {/* markers */}
-        {markers.map((m) => {
-          const x = secToX(m.t);
-          return (
-            <g key={m.id} transform={`translate(${x},0)`}>
-              <line
-                x1="0"
-                x2="0"
-                y1="0"
-                y2={shape.H}
-                stroke="#22d3ee"
-                strokeWidth="2"
-                opacity="0.9"
-                data-type="marker"
-                data-id={m.id}
-                style={{ cursor: "ew-resize" }}
-              />
-              <rect
-                x="-30"
-                y="8"
-                width="60"
-                height="20"
-                rx="6"
-                fill="#0ea5b7"
-                opacity="0.95"
-              />
-              <text
-                x="0"
-                y="22"
-                textAnchor="middle"
-                fontSize="12"
-                fill="white"
-                style={{ pointerEvents: "none" }}
-              >
-                {m.label}
-              </text>
-              <circle
-                cx="0"
-                cy={shape.H - 10}
-                r="6"
-                fill="#22d3ee"
-                stroke="white"
-                strokeWidth="2"
-                data-type="marker"
-                data-id={m.id}
-                style={{ cursor: "ew-resize" }}
-                onDoubleClick={() => onMarkerRemove?.(m.id)}
-              />
-            </g>
-          );
-        })}
+        {/* Dimmed areas outside loop */}
+        <path
+          d={shape.d}
+          fill="rgba(0,0,0,0.5)"
+          stroke="none"
+          mask="url(#loop-mask)"
+        />
       </svg>
+
+      {/* Scrubbing bar */}
+      <div
+        className="waveform-scrubber"
+        style={{ left: `${progress * 100}%` }}
+        onMouseDown={(e) => handleMouseDown(e, "scrub")}
+      >
+        <div className="scrubber-line" />
+      </div>
+
+      {/* Start clip handle */}
+      <div
+        className="waveform-clip-handle start"
+        style={{ left: `${startPos * 100}%` }}
+        onMouseDown={(e) => handleMouseDown(e, "start")}
+      >
+        <div className="clip-handle-cap" />
+      </div>
+
+      {/* End clip handle */}
+      <div
+        className="waveform-clip-handle end"
+        style={{ left: `${endPos * 100}%` }}
+        onMouseDown={(e) => handleMouseDown(e, "end")}
+      >
+        <div className="clip-handle-cap" />
+      </div>
     </div>
   );
 }

@@ -4,6 +4,9 @@ const path = require("path");
 
 let win; // make it visible to the IPC handlers
 
+const PANEL_HEIGHT = 1004;
+const DASHBOARD_HEIGHT = 800;
+
 function createWindow() {
   win = new BrowserWindow({
     width: 960,
@@ -13,13 +16,14 @@ function createWindow() {
     transparent: true, // no window background
     hasShadow: false,
     resizable: false,
-    vibrancy: process.platform === "darwin" ? "under-window" : "mica",
+    backgroundColor: "#00000000", // fully transparent
     webPreferences: {
       contextIsolation: true,
       preload: path.join(__dirname, "preload.js"), // <-- the bridge
     },
   });
 
+  // Remove vibrancy for true transparency
   win.setBackgroundColor("#00000000");
 
   // DEV: CRA on port 3000; change if you use Vite or file:// build

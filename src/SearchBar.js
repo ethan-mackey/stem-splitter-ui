@@ -24,21 +24,23 @@ function SearchBar({ onSearch }) {
   };
 
   return (
-    <div className="pill-window" style={{ WebkitAppRegion: "no-drag" }}>
-      {!value && !focused && (
-        <span key={index} className="pill-text">
-          {messages[index]}
-        </span>
-      )}
-      <input
-        className="pill-input"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        style={{ WebkitAppRegion: "no-drag" }}
-      />
+    <div className="pill-wrapper" style={{ WebkitAppRegion: "no-drag" }}>
+      <div className="pill-window">
+        {!value && !focused && (
+          <span key={index} className="pill-text">
+            {messages[index]}
+          </span>
+        )}
+        <input
+          className="pill-input"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={{ WebkitAppRegion: "no-drag" }}
+        />
+      </div>
     </div>
   );
 }
