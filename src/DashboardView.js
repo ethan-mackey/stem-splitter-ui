@@ -1,4 +1,3 @@
-// DashboardView.js
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import YouTubePlayer from "./YoutubePlayer";
@@ -7,7 +6,7 @@ import CustomDropdown from "./CustomDropdown";
 import "./App.css";
 
 export default function DashboardView({ video, onBack }) {
-  /* ---------- hooks (must run every render) ---------- */
+  
   const ytRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -25,10 +24,10 @@ export default function DashboardView({ video, onBack }) {
     other: false,
   });
 
-  /* ---------- early guard ---------- */
+  
   if (!video) return null;
 
-  /* ---------- dropdown options ---------- */
+  
   const audioFormatOptions = [
     { value: "wav", label: "WAV" },
     { value: "aiff", label: "AIFF" },
@@ -40,19 +39,13 @@ export default function DashboardView({ video, onBack }) {
     { value: "mdxnet-hq", label: "MDXNet HQ" },
   ];
 
-  /* ---------- helpers ---------- */
+  
   const volume = 80;
   const rate = 1;
   const progress = duration ? Math.min(1, current / duration) : 0;
   const seek = (s) => ytRef.current?.seek(Math.max(0, Math.min(duration, s)));
 
-  // Get active stem index for background bar positioning
-  const getActiveIndex = () => {
-    const stemKeys = Object.keys(stems);
-    return stemKeys.findIndex((key) => stems[key]);
-  };
-
-  /* ---------- render ---------- */
+  
   return (
     <motion.div
       className="dashboard"
@@ -61,12 +54,12 @@ export default function DashboardView({ video, onBack }) {
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.1 }}
     >
-      {/* ---- header bar ---- */}
+      
       <div className="dash-header">
         <img src={video.thumbnail} className="dash-thumbnail" alt="" />
         <div className="dash-info">
-          <h2 className="dash-title">DANI CALIFORNIA</h2>
-          <p className="dash-artist">Red Hot Chili Peppers</p>
+          <h2 className="dash-title">{video.title}</h2>
+          <p className="dash-artist">{video.channel}</p>
         </div>
         <button className="dash-close" onClick={onBack}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -80,17 +73,18 @@ export default function DashboardView({ video, onBack }) {
         </button>
       </div>
 
-      {/* ---- main content ---- */}
+      
       <div className="dash-content">
-        {/* Left sidebar container */}
+        
         <div className="dash-sidebar">
-          {/* Left side controls */}
+          
           <div className="dash-controls">
             <CustomDropdown
               options={audioFormatOptions}
               placeholder="Select audio format"
               value={audioFormat}
               onChange={setAudioFormat}
+              pushContent={true}
             />
 
             <CustomDropdown
@@ -98,14 +92,10 @@ export default function DashboardView({ video, onBack }) {
               placeholder="Select AI Model"
               value={aiModel}
               onChange={setAiModel}
+              pushContent={false}
             />
 
-            <div
-              className={`stem-list ${
-                Object.values(stems).some((v) => v) ? "has-active" : ""
-              }`}
-              data-active-index={getActiveIndex()}
-            >
+            <div className="stem-list">
               {Object.entries(stems).map(([k, v]) => (
                 <div
                   key={k}
@@ -121,11 +111,11 @@ export default function DashboardView({ video, onBack }) {
             </div>
           </div>
 
-          {/* Split button at bottom of sidebar */}
+          
           <button className="split-audio-btn">SPLIT AUDIO</button>
         </div>
 
-        {/* Right side waveform */}
+        
         <div className="dash-waveform-container">
           <div className="waveform-time-left">{formatTime(current)}</div>
           <Waveform
@@ -133,6 +123,8 @@ export default function DashboardView({ video, onBack }) {
             markers={markers}
             duration={duration}
             loop={loop}
+            videoId={video?.id}
+            youtubePlayer={ytRef.current}
             onScrub={(r) => seek(r * duration)}
             onMarkerAdd={(t) =>
               setMarkers((m) => [...m, { id: crypto.randomUUID(), t }])
@@ -147,7 +139,7 @@ export default function DashboardView({ video, onBack }) {
           />
           <div className="waveform-time-right">{formatTime(duration)}</div>
 
-          {/* Transport controls */}
+          
           <div className="dash-transport">
             <button className="transport-btn" onClick={() => seek(current - 5)}>
               <svg
@@ -200,7 +192,7 @@ export default function DashboardView({ video, onBack }) {
         </div>
       </div>
 
-      {/* Hidden YouTube player */}
+      
       <YouTubePlayer
         ref={ytRef}
         videoId={video.id}

@@ -1,5 +1,5 @@
-// Waveform.js
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
+import { audioAnalyzer } from "./audioAnalysis";
 import "./App.css";
 
 export default function Waveform({
@@ -8,54 +8,58 @@ export default function Waveform({
   loop = null,
   onScrub,
   onLoopChange,
+  videoId = null,
+  youtubePlayer = null,
 }) {
   const ref = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragType, setDragType] = useState(null); // 'scrub', 'start', 'end'
+  const [dragType, setDragType] = useState(null);
+  const [waveformData, setWaveformData] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  
+  useEffect(() => {
+    if (!videoId) return;
+
+    setIsAnalyzing(true);
+    
+    const analyzeAudio = async () => {
+      try {
+        let data;
+        
+        
+        if (youtubePlayer) {
+          data = await audioAnalyzer.analyzeFromYouTubePlayer(youtubePlayer);
+        } else {
+          
+          data = await audioAnalyzer.analyzeYouTubeVideo(videoId);
+        }
+        
+        setWaveformData(data);
+      } catch (error) {
+        console.warn('Audio analysis failed, using fallback:', error);
+        setWaveformData(audioAnalyzer.generateFallbackWaveform());
+      } finally {
+        setIsAnalyzing(false);
+      }
+    };
+
+    analyzeAudio();
+  }, [videoId, youtubePlayer]);
 
   const shape = useMemo(() => {
     const W = 740;
     const H = 180;
-    const mid = H / 2;
-    const steps = 200;
-    let d = `M 0 ${mid}`;
 
-    // Generate more realistic waveform pattern
-    for (let i = 0; i <= steps; i++) {
-      const x = (i / steps) * W;
-      const t = i / steps;
-
-      // Create varying amplitude
-      const amp1 = 35 * Math.sin(t * Math.PI * 8 + 1);
-      const amp2 = 25 * Math.sin(t * Math.PI * 12 + 2);
-      const amp3 = 15 * Math.sin(t * Math.PI * 20 + 3);
-      const envelope = Math.sin(t * Math.PI) * 0.8 + 0.2;
-
-      const amplitude = (amp1 + amp2 + amp3) * envelope;
-      const y = mid - Math.abs(amplitude);
-
-      d += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
+    
+    if (waveformData && waveformData.length > 0) {
+      return audioAnalyzer.convertToSVGPath(waveformData, W, H);
     }
 
-    // Mirror for bottom half
-    for (let i = steps; i >= 0; i--) {
-      const x = (i / steps) * W;
-      const t = i / steps;
-
-      const amp1 = 35 * Math.sin(t * Math.PI * 8 + 1);
-      const amp2 = 25 * Math.sin(t * Math.PI * 12 + 2);
-      const amp3 = 15 * Math.sin(t * Math.PI * 20 + 3);
-      const envelope = Math.sin(t * Math.PI) * 0.8 + 0.2;
-
-      const amplitude = (amp1 + amp2 + amp3) * envelope;
-      const y = mid + Math.abs(amplitude);
-
-      d += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
-    }
-
-    d += " Z";
-    return { d, W, H, mid };
-  }, []);
+    
+    const fallbackData = audioAnalyzer.generateFallbackWaveform();
+    return audioAnalyzer.convertToSVGPath(fallbackData, W, H);
+  }, [waveformData]);
 
   const toRatio = (clientX) => {
     const box = ref.current?.getBoundingClientRect();
@@ -142,18 +146,33 @@ export default function Waveform({
           </mask>
         </defs>
 
-        {/* Background waveform */}
+        
         <path d={shape.d} fill="rgba(255,255,255,0.1)" stroke="none" />
 
-        {/* Progress waveform */}
+        
         <path
           d={shape.d}
           fill="url(#waveform-gradient)"
           stroke="none"
           clipPath="url(#progress-clip)"
+          opacity={isAnalyzing ? 0.5 : 1}
         />
 
-        {/* Dimmed areas outside loop */}
+        
+        {isAnalyzing && (
+          <text
+            x={shape.W / 2}
+            y={shape.mid}
+            textAnchor="middle"
+            fill="rgba(255,255,255,0.7)"
+            fontSize="14"
+            fontFamily="Inter, sans-serif"
+          >
+            Analyzing audio...
+          </text>
+        )}
+
+        
         <path
           d={shape.d}
           fill="rgba(0,0,0,0.5)"
@@ -162,7 +181,7 @@ export default function Waveform({
         />
       </svg>
 
-      {/* Scrubbing bar */}
+      
       <div
         className="waveform-scrubber"
         style={{ left: `${progress * 100}%` }}
@@ -171,7 +190,7 @@ export default function Waveform({
         <div className="scrubber-line" />
       </div>
 
-      {/* Start clip handle */}
+      
       <div
         className="waveform-clip-handle start"
         style={{ left: `${startPos * 100}%` }}
@@ -180,7 +199,7 @@ export default function Waveform({
         <div className="clip-handle-cap" />
       </div>
 
-      {/* End clip handle */}
+      
       <div
         className="waveform-clip-handle end"
         style={{ left: `${endPos * 100}%` }}

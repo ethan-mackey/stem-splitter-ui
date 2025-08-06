@@ -1,4 +1,3 @@
-// CustomDropdown.js
 import React, { useState, useEffect, useRef } from "react";
 
 const CustomDropdown = ({
@@ -7,12 +6,13 @@ const CustomDropdown = ({
   value,
   onChange,
   className = "",
+  pushContent = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedValue, setSelectedValue] = useState(value || "");
   const dropdownRef = useRef(null);
 
-  // Close dropdown when clicking outside
+  
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -24,7 +24,7 @@ const CustomDropdown = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Update internal state when value prop changes
+  
   useEffect(() => {
     setSelectedValue(value || "");
   }, [value]);
@@ -43,7 +43,7 @@ const CustomDropdown = ({
   };
 
   return (
-    <div className={`dash-select-wrapper ${className}`} ref={dropdownRef}>
+    <div className={`dash-select-wrapper ${className} ${isOpen && pushContent ? "dropdown-open" : ""}`} ref={dropdownRef}>
       <div
         className={`dash-select ${isOpen ? "open" : ""}`}
         onClick={() => setIsOpen(!isOpen)}

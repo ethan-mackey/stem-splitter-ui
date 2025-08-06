@@ -1,4 +1,3 @@
-// VideoCard.js
 import "./App.css";
 
 function formatDuration(iso) {

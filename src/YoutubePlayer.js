@@ -1,4 +1,3 @@
-// YouTubePlayer.js
 import {
   useEffect,
   useRef,
@@ -80,7 +79,7 @@ const YouTubePlayer = forwardRef(function YouTubePlayer(
         playerRef.current?.destroy();
       } catch {}
     };
-  }, [videoId]); // recreate on new selection
+  }, [videoId]);
 
   useEffect(() => {
     if (ready) playerRef.current?.setVolume?.(volume);

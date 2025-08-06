@@ -12,14 +12,14 @@ const PANEL_HEIGHT = 540;
 const DASHBOARD_HEIGHT = 640;
 
 export default function App() {
-  /* ---------- state ---------- */
+  
   const [results, setResults] = useState([]);
   const [msgIdx, setMsgIdx] = useState(0);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  /* ---------- rotating pill messages ---------- */
+  
   useEffect(() => {
     const id = setInterval(
       () => setMsgIdx((i) => (i + 1) % messages.length),
@@ -28,7 +28,7 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  /* ---------- Electron: resize outer shell ---------- */
+  
   useEffect(() => {
     if (selected) {
       window.electronAPI?.resultsOpened(DASHBOARD_HEIGHT);
@@ -39,7 +39,7 @@ export default function App() {
     }
   }, [results.length, selected]);
 
-  /* ---------- YouTube search ---------- */
+  
   const handleSearch = async (term) => {
     const q = term.trim();
     if (!q) {
@@ -54,7 +54,7 @@ export default function App() {
       const key = process.env.REACT_APP_YT_API_KEY || "";
       const base = "https://www.googleapis.com/youtube/v3";
 
-      // 1) search for videos
+      
       const sURL = `${base}/search?part=snippet&type=video&maxResults=8&q=${encodeURIComponent(
         q
       )}${key ? `&key=${key}` : ""}`;
@@ -64,7 +64,7 @@ export default function App() {
         return;
       }
 
-      // 2) fetch durations
+      
       const ids = items.map((i) => i.id.videoId).join(",");
       const dURL = `${base}/videos?part=contentDetails&id=${ids}${
         key ? `&key=${key}` : ""
@@ -74,7 +74,7 @@ export default function App() {
         details.map((d) => [d.id, d.contentDetails.duration])
       );
 
-      // 3) map to your result shape
+      
       setResults(
         items.map((i) => ({
           id: i.id.videoId,
@@ -92,14 +92,14 @@ export default function App() {
     }
   };
 
-  /* ---------- render ---------- */
+  
   return (
     <WindowWrapper>
       {selected ? (
-        /* ===== DASHBOARD VIEW ===== */
+        
         <DashboardView video={selected} onBack={() => setSelected(null)} />
       ) : (
-        /* ===== SEARCH + RESULTS ===== */
+        
         <>
           <SearchBar onSearch={handleSearch} loading={loading}>
             <span key={msgIdx} className="pill-text">

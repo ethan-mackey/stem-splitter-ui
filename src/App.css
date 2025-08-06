@@ -1,16 +1,14 @@
-/* =========================  GLOBAL  ========================= */
 body{margin:0;background:transparent;font-family:"Inter",sans-serif}
 .App{
   min-height:100vh;
   display:flex;
-  flex-direction:column;      /* stack pill then panel/dashboard */
+  flex-direction:column;
   justify-content:center;
   align-items:center;
   background:transparent;
   position:relative;
 }
 
-/* ---------- SEARCH PILL WINDOW ---------- */
 .pill-window{
   width:960px;
   height:78px;
@@ -26,7 +24,6 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   isolation: isolate;
 }
 
-/* Create gradient border using pseudo-element */
 .pill-window::before {
   content: "";
   position: absolute;
@@ -37,7 +34,6 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   z-index: -1;
 }
 
-/* Inner mask to create border effect */
 .pill-window::after {
   content: "";
   position: absolute;
@@ -54,7 +50,6 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   100%{background-position:200% 0}
 }
 
-/* placeholder + input styles - ensure they're above the glass */
 .pill-text  { 
   position: relative; 
   font-size: 24px; 
@@ -81,7 +76,6 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   border-radius: 39px;
 }
 
-/* Error banner */
 .error-banner{
   color:#ff6b6b;
   padding:8px 16px;
@@ -89,7 +83,6 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   margin-top:8px;
 }
 
-/* Results window */
 .results-window{
   width:960px;height:540px;margin:24px auto 0;
   position:relative;border-radius:28px;
@@ -113,7 +106,6 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
 .video-meta{display:flex;align-items:center;gap:4px;font-size:12px;color:#b3b3b3;margin:0 8px 8px}
 .yt-badge{background:#ff0000;color:#fff;padding:2px 4px;border-radius:4px;font-size:12px}
 
-/* =====================  DASHBOARD  ========================= */
 .dashboard{
   width:1900px;
   height:1200px;
@@ -129,7 +121,7 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
 .dash-header{
   display:flex;
   align-items:center;
-  padding:16px 18px;  /* Reduced from 28px to 16px on top */
+  padding:16px 18px;
   border-bottom:1px solid rgba(255,255,255,0.1);
   background: linear-gradient(to bottom, rgba(255,255,255,0.02), transparent);
 }
@@ -179,7 +171,6 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   color:#fff;
 }
 
-/* ----- main content ----- */
 .dash-content{
   flex:1;
   display:flex;
@@ -188,13 +179,11 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   align-items: flex-start;
 }
 
-/* ----- sidebar container ----- */
 .dash-sidebar{
   width:360px;
   min-height:1003px;
   position:relative;
   border-radius: 7px 33px 33px 33px;
-  /* Debug: bright red background */
   background: #1D1D1DC2;
   box-shadow: 
     0 2px 2px rgba(0,0,0,0.8),
@@ -206,7 +195,6 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
 }
 
 
-/* ----- left controls ----- */
 .dash-controls{
   flex:1;
   display:flex;
@@ -215,6 +203,7 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   margin-bottom:20px;
   position: relative;
   z-index: 10;
+  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
 }
 
 .dash-select {
@@ -232,11 +221,18 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   z-index: 11;
 }
 
-/* ----- Custom Dropdown Styles (Add to App.css) ----- */
 .dash-select-wrapper {
   position: relative;
   width: 100%;
+  transition: margin-bottom 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
 }
+
+.dash-select-wrapper.dropdown-open + .dash-select-wrapper {
+  position: relative;
+  top: 180px;
+  transition: top 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
 
 .dash-select {
   width: 80%;
@@ -260,7 +256,6 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   user-select: none;
 }
 
-/* Chevron icon */
 .dash-select-chevron {
   position: absolute;
   right: 20px;
@@ -288,30 +283,31 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   border-top-color: #fff;
 }
 
-/* Custom dropdown menu */
 .dash-dropdown {
   position: absolute;
-  top: calc(100% - 28px); /* Overlap with the select button */
+  top: 100%;
   left: 0;
   right: 0;
   background: #2a2451;
   border-radius: 28px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 40px 0 12px 0; /* Extra top padding to account for overlap */
+  padding: 12px 0;
   opacity: 0;
   visibility: hidden;
-  transform: translateY(-10px);
-  transition: all 0.2s ease;
+  transform: translateY(-10px) scaleY(0.8);
+  transform-origin: top;
+  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
   z-index: 100;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   max-height: 200px;
   overflow-y: auto;
+  margin-top: 8px;
 }
 
 .dash-dropdown.open {
   opacity: 1;
   visibility: visible;
-  transform: translateY(0);
+  transform: translateY(0) scaleY(1);
 }
 
 .dash-option {
@@ -320,7 +316,7 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   color: #b8b5d6;
   font: 500 16px "Inter", sans-serif;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
   position: relative;
   user-select: none;
 }
@@ -342,7 +338,6 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   font-weight: bold;
 }
 
-/* Scrollbar styling for dropdown */
 .dash-dropdown::-webkit-scrollbar {
   width: 6px;
 }
@@ -361,58 +356,53 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   background: rgba(255, 255, 255, 0.3);
 }
 
-/* ----- stems list ----- */
 .stem-list{
   display:flex;
   flex-direction:column;
-  gap:8px;
-  margin-top:20px;
+  gap:4px;
+  margin-top:150px;
   margin-bottom:24px;
   padding:8px;
   position:relative;
-  background:rgba(0,0,0,0.2);
   border-radius:20px;
 }
 
-/* Animated background bar */
 .stem-list::before{
   content:'';
   position:absolute;
-  left:8px;
-  right:8px;
-  height:52px;
-  border-radius:14px;
-  background:linear-gradient(90deg, #7c3aed, #c026d3, #ff0a9c, #c026d3, #7c3aed);
-  background-size:200% 100%;
-  animation:stemGradient 3s linear infinite;
-  transition:transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  left:5px;
+  top:29px;
+  bottom:30px;
+  width:28px;
+  border-radius:140px;
+  background:linear-gradient(180deg, 
+    rgba(138, 43, 226, 0.3) 0%,
+    rgba(147, 51, 234, 0.5) 20%,
+    rgba(168, 85, 247, 0.6) 35%,
+    rgba(196, 38, 211, 0.7) 50%,
+    rgba(236, 72, 153, 0.6) 65%,
+    rgba(147, 51, 234, 0.5) 80%,
+    rgba(138, 43, 226, 0.3) 100%
+  );
+  background-size:10% 300%;
+  animation:verticalGradient 16s ease-in-out infinite;
   z-index:0;
-  opacity:0;
-}
-
-@keyframes stemGradient{
-  0%{background-position:0% 50%}
-  100%{background-position:200% 50%}
-}
-
-/* Show and position the bar based on active item */
-.stem-list.has-active::before{
   opacity:1;
 }
 
-.stem-list[data-active-index="0"]::before{ transform:translateY(0px); }
-.stem-list[data-active-index="1"]::before{ transform:translateY(60px); }
-.stem-list[data-active-index="2"]::before{ transform:translateY(120px); }
-.stem-list[data-active-index="3"]::before{ transform:translateY(180px); }
-.stem-list[data-active-index="4"]::before{ transform:translateY(240px); }
-.stem-list[data-active-index="5"]::before{ transform:translateY(300px); }
+@keyframes verticalGradient{
+  0%{background-position:50% 0%}
+  50%{background-position:50% 100%}
+  100%{background-position:50% 0%}
+}
 
 .stem-item{
   display:flex;
   align-items:center;
-  gap:16px;
-  padding:14px 20px;
-  border-radius:14px;
+  gap:10px;
+  padding:10px 10px;
+  border-radius:12px;
+  padding-left: 1px;
   cursor:pointer;
   transition:all 0.2s;
   position:relative;
@@ -420,10 +410,6 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   height:52px;
 }
 
-.stem-item:hover{
-  background:rgba(255,255,255,0.05);
-  padding-left:24px;
-}
 
 .stem-dot{
   width:20px;
@@ -456,19 +442,19 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
 
 .stem-label{
   color:#b8b5d6;
-  font:600 16px "Inter",sans-serif;
+  font:800 20px "Inter",sans-serif;
   transition:color 0.2s;
   letter-spacing:0.5px;
 }
 
 .stem-item.active .stem-label{
   color:#fff;
-  text-shadow:0 0 20px rgba(255,255,255,0.5);
+  text-shadow:0 0 18px rgba(255,255,255,0.5);
 }
 
 .stem-label{
   color:#b8b5d6;
-  font:500 14px "Inter",sans-serif;
+  font:500 18px "Inter",sans-serif;
   transition:color 0.2s;
 }
 
@@ -476,7 +462,6 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   color:#fff;
 }
 
-/* ----- waveform container ----- */
 .dash-waveform-container{
   flex:1;
   display:flex;
@@ -517,7 +502,6 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   right:-50px;
 }
 
-/* ----- scrubber ----- */
 .waveform-scrubber{
   position:absolute;
   top:0;
@@ -538,7 +522,6 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   pointer-events:none;
 }
 
-/* ----- clip handles ----- */
 .waveform-clip-handle{
   position:absolute;
   top:0;
@@ -569,7 +552,6 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   left:0;
 }
 
-/* ----- transport ----- */
 .dash-transport{
   display:flex;
   gap:16px;
@@ -608,7 +590,6 @@ body{margin:0;background:transparent;font-family:"Inter",sans-serif}
   box-shadow:0 4px 16px rgba(192,38,211,0.4);
 }
 
-/* ----- split button ----- */
 .split-audio-btn{
   margin-top:auto;
   width:100%;
