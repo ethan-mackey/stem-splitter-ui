@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import YouTubePlayer from "./YoutubePlayer";
 import Waveform from "./Waveform";
+import CustomDropdown from "./CustomDropdown";
 import "./App.css";
 
 export default function DashboardView({ video, onBack }) {
@@ -13,6 +14,8 @@ export default function DashboardView({ video, onBack }) {
   const [duration, setDuration] = useState(0);
   const [loop, setLoop] = useState(null);
   const [markers, setMarkers] = useState([]);
+  const [audioFormat, setAudioFormat] = useState("");
+  const [aiModel, setAiModel] = useState("");
   const [stems, setStems] = useState({
     vocals: true,
     piano: false,
@@ -25,11 +28,29 @@ export default function DashboardView({ video, onBack }) {
   /* ---------- early guard ---------- */
   if (!video) return null;
 
+  /* ---------- dropdown options ---------- */
+  const audioFormatOptions = [
+    { value: "wav", label: "WAV" },
+    { value: "aiff", label: "AIFF" },
+    { value: "mp3", label: "MP3" },
+  ];
+
+  const aiModelOptions = [
+    { value: "ht-demucs-v4", label: "HT Demucs v4" },
+    { value: "mdxnet-hq", label: "MDXNet HQ" },
+  ];
+
   /* ---------- helpers ---------- */
   const volume = 80;
   const rate = 1;
   const progress = duration ? Math.min(1, current / duration) : 0;
   const seek = (s) => ytRef.current?.seek(Math.max(0, Math.min(duration, s)));
+
+  // Get active stem index for background bar positioning
+  const getActiveIndex = () => {
+    const stemKeys = Object.keys(stems);
+    return stemKeys.findIndex((key) => stems[key]);
+  };
 
   /* ---------- render ---------- */
   return (
@@ -65,24 +86,26 @@ export default function DashboardView({ video, onBack }) {
         <div className="dash-sidebar">
           {/* Left side controls */}
           <div className="dash-controls">
-            <select className="dash-select" defaultValue="">
-              <option value="" disabled>
-                Select audio format
-              </option>
-              <option>WAV</option>
-              <option>AIFF</option>
-              <option>MP3</option>
-            </select>
+            <CustomDropdown
+              options={audioFormatOptions}
+              placeholder="Select audio format"
+              value={audioFormat}
+              onChange={setAudioFormat}
+            />
 
-            <select className="dash-select" defaultValue="">
-              <option value="" disabled>
-                Select AI Model
-              </option>
-              <option>HT Demucs v4</option>
-              <option>MDXNet HQ</option>
-            </select>
+            <CustomDropdown
+              options={aiModelOptions}
+              placeholder="Select AI Model"
+              value={aiModel}
+              onChange={setAiModel}
+            />
 
-            <div className="stem-list">
+            <div
+              className={`stem-list ${
+                Object.values(stems).some((v) => v) ? "has-active" : ""
+              }`}
+              data-active-index={getActiveIndex()}
+            >
               {Object.entries(stems).map(([k, v]) => (
                 <div
                   key={k}
