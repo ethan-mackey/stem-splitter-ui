@@ -29,79 +29,59 @@ export class AudioAnalyzer {
     } catch (error) {
       console.warn("Failed to analyze YouTube audio:", error);
 
-      return this.generateFallbackWaveform();
+      const fallback = await this.generateFallbackAudioBuffer();
+      return this.generateWaveformData(fallback);
     }
   }
 
   async getYouTubeAudioUrl(videoId) {
     try {
-      const corsProxy = "https://api.allorigins.win/raw?url=";
-      const youtubeUrl = encodeURIComponent(
-        `https://www.youtube.com/watch?v=${videoId}`
-      );
-
-      const response = await fetch(`${corsProxy}${youtubeUrl}`);
-      const html = await response.text();
-
-      const audioUrlMatch = html.match(/"url":"([^"]*audioonly[^"]*)"/);
-      if (audioUrlMatch) {
-        return decodeURIComponent(audioUrlMatch[1].replace(/\\u0026/g, "&"));
+      const apiUrl = `https://piped.video/streams/${videoId}`;
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-
-      const adaptiveFormatsMatch = html.match(/"adaptiveFormats":\[(.*?)\]/);
-      if (adaptiveFormatsMatch) {
-        const formats = JSON.parse(`[${adaptiveFormatsMatch[1]}]`);
-        const audioFormat = formats.find(
-          (f) => f.mimeType && f.mimeType.includes("audio")
-        );
-        if (audioFormat && audioFormat.url) {
-          return audioFormat.url;
-        }
-      }
+      const data = await response.json();
+      const audio = data?.audioStreams?.[0]?.url;
+      return audio || null;
     } catch (error) {
       console.warn("Failed to extract audio URL:", error);
+      return null;
     }
-
-    return null;
   }
 
   async fetchAndDecodeAudio(audioUrl) {
     const context = await this.initializeAudioContext();
 
-    try {
-      const corsProxy = "https://api.allorigins.win/raw?url=";
-      const proxyUrl = `${corsProxy}${encodeURIComponent(audioUrl)}`;
-
-      const response = await fetch(proxyUrl, {
-        mode: "cors",
-        headers: {
-          Accept: "audio/*,*/*",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
-      const audioBuffer = await context.decodeAudioData(arrayBuffer);
-
-      this.audioBuffer = audioBuffer;
-      return audioBuffer;
-    } catch (error) {
-      console.warn("Failed to fetch and decode audio:", error);
-      try {
-        const directResponse = await fetch(audioUrl, { mode: "no-cors" });
-        const arrayBuffer = await directResponse.arrayBuffer();
-        const audioBuffer = await context.decodeAudioData(arrayBuffer);
-
-        this.audioBuffer = audioBuffer;
-        return audioBuffer;
-      } catch (directError) {
-        console.warn("Direct fetch also failed:", directError);
-        throw error;
-      }
+    const response = await fetch(audioUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = await context.decodeAudioData(arrayBuffer);
+
+    this.audioBuffer = audioBuffer;
+    return audioBuffer;
+  }
+
+  async generateFallbackAudioBuffer(duration = 2) {
+    const context = await this.initializeAudioContext();
+    const sampleRate = context.sampleRate;
+    const frameCount = Math.floor(sampleRate * duration);
+    const buffer = context.createBuffer(1, frameCount, sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < frameCount; i++) {
+      const t = i / frameCount;
+      const bass = Math.sin(2 * Math.PI * t) * 0.3;
+      const mid = Math.sin(2 * Math.PI * 4 * t) * 0.2;
+      const noise = (Math.random() - 0.5) * 0.1;
+      data[i] = bass + mid + noise;
+    }
+
+    this.audioBuffer = buffer;
+    return buffer;
   }
 
   generateWaveformData(audioBuffer, sampleCount = 200) {
