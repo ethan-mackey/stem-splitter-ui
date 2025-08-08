@@ -104,7 +104,10 @@ export default function Waveform({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load real audio for the selected video
+  // Cache for analyzed audio buffers
+  const audioBufferCache = useRef({});
+
+  // Load real audio for the selected video, with caching
   useEffect(() => {
     let cancelled = false;
 
@@ -116,12 +119,15 @@ export default function Waveform({
       setLoadError(null);
 
       try {
-        // Use *your* analyzer to find & decode the audio
-        await audioAnalyzer.analyzeYouTubeVideo(id);
-        const buffer = audioAnalyzer.audioBuffer;
-
+        let buffer = audioBufferCache.current[id];
         if (!buffer) {
-          throw new Error("Audio buffer not available.");
+          // Use *your* analyzer to find & decode the audio
+          await audioAnalyzer.analyzeYouTubeVideo(id);
+          buffer = audioAnalyzer.audioBuffer;
+          if (!buffer) {
+            throw new Error("Audio buffer not available.");
+          }
+          audioBufferCache.current[id] = buffer;
         }
 
         const wavBlob = audioBufferToWav(buffer);

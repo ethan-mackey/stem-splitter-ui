@@ -116,10 +116,7 @@ ipcMain.handle("download-audio-for-video", async (_evt, { videoId }) => {
   } catch {}
 
   // Convert Node Buffer -> ArrayBuffer for structured clone back to renderer
-  const arrayBuffer = buf.buffer.slice(
-    buf.byteOffset,
-    buf.byteOffset + buf.byteLength
-  );
+  const arrayBuffer = Buffer.from(buf).buffer;
 
   return { mime, data: arrayBuffer };
 });
