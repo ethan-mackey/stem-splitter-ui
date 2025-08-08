@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const CustomDropdown = ({
   options,
@@ -42,29 +43,86 @@ const CustomDropdown = ({
     return selected ? selected.label : placeholder;
   };
 
+  const springConfig = {
+    type: "spring",
+    stiffness: 400,
+    damping: 28,
+    mass: 0.8
+  };
+
+  const chevronSpring = {
+    type: "spring",
+    stiffness: 300,
+    damping: 25
+  };
+
   return (
     <div className={`dash-select-wrapper ${className} ${isOpen && pushContent ? "dropdown-open" : ""}`} ref={dropdownRef}>
-      <div
+      <motion.div
         className={`dash-select ${isOpen ? "open" : ""}`}
         onClick={() => setIsOpen(!isOpen)}
+        whileHover={{ 
+          scale: 1.02,
+          backgroundColor: "#423a6d"
+        }}
+        whileTap={{ scale: 0.98 }}
+        transition={springConfig}
       >
         <span>{getSelectedLabel()}</span>
-        <div className="dash-select-chevron"></div>
-      </div>
+        <motion.div 
+          className="dash-select-chevron"
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          transition={chevronSpring}
+        />
+      </motion.div>
 
-      <div className={`dash-dropdown ${isOpen ? "open" : ""}`}>
-        {options.map((option) => (
-          <div
-            key={option.value}
-            className={`dash-option ${
-              selectedValue === option.value ? "selected" : ""
-            }`}
-            onClick={() => handleSelect(option.value, option.label)}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            className="dash-dropdown open"
+            initial={{ 
+              opacity: 0,
+              scale: 0.95,
+              y: -8
+            }}
+            animate={{ 
+              opacity: 1,
+              scale: 1,
+              y: 0
+            }}
+            exit={{ 
+              opacity: 0,
+              scale: 0.95,
+              y: -8
+            }}
+            transition={springConfig}
+            style={{ transformOrigin: "top" }}
           >
-            {option.label}
-          </div>
-        ))}
-      </div>
+            {options.map((option, index) => (
+              <motion.div
+                key={option.value}
+                className={`dash-option ${
+                  selectedValue === option.value ? "selected" : ""
+                }`}
+                onClick={() => handleSelect(option.value, option.label)}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{
+                  ...springConfig,
+                  delay: index * 0.05
+                }}
+                whileHover={{ 
+                  x: 4,
+                  backgroundColor: "rgba(255, 255, 255, 0.08)"
+                }}
+                whileTap={{ scale: 0.98 }}
+              >
+                {option.label}
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
