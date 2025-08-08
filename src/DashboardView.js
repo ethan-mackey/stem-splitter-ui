@@ -6,7 +6,6 @@ import CustomDropdown from "./CustomDropdown";
 import "./App.css";
 
 export default function DashboardView({ video, onBack }) {
-  
   const ytRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -24,10 +23,8 @@ export default function DashboardView({ video, onBack }) {
     other: false,
   });
 
-  
   if (!video) return null;
 
-  
   const audioFormatOptions = [
     { value: "wav", label: "WAV" },
     { value: "aiff", label: "AIFF" },
@@ -39,13 +36,11 @@ export default function DashboardView({ video, onBack }) {
     { value: "mdxnet-hq", label: "MDXNet HQ" },
   ];
 
-  
   const volume = 80;
   const rate = 1;
   const progress = duration ? Math.min(1, current / duration) : 0;
   const seek = (s) => ytRef.current?.seek(Math.max(0, Math.min(duration, s)));
 
-  
   return (
     <motion.div
       className="dashboard"
@@ -54,7 +49,6 @@ export default function DashboardView({ video, onBack }) {
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.1 }}
     >
-      
       <div className="dash-header">
         <img src={video.thumbnail} className="dash-thumbnail" alt="" />
         <div className="dash-info">
@@ -73,11 +67,8 @@ export default function DashboardView({ video, onBack }) {
         </button>
       </div>
 
-      
       <div className="dash-content">
-        
         <div className="dash-sidebar">
-          
           <div className="dash-controls">
             <CustomDropdown
               options={audioFormatOptions}
@@ -111,11 +102,9 @@ export default function DashboardView({ video, onBack }) {
             </div>
           </div>
 
-          
           <button className="split-audio-btn">SPLIT AUDIO</button>
         </div>
 
-        
         <div className="dash-waveform-container">
           <div className="waveform-time-left">{formatTime(current)}</div>
           <Waveform
@@ -139,7 +128,6 @@ export default function DashboardView({ video, onBack }) {
           />
           <div className="waveform-time-right">{formatTime(duration)}</div>
 
-          
           <div className="dash-transport">
             <button className="transport-btn" onClick={() => seek(current - 5)}>
               <svg
@@ -192,7 +180,6 @@ export default function DashboardView({ video, onBack }) {
         </div>
       </div>
 
-      
       <YouTubePlayer
         ref={ytRef}
         videoId={video.id}
