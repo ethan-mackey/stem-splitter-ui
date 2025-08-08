@@ -1,6 +1,46 @@
-import { useMemo, useRef, useState, useEffect } from "react";
-import { audioAnalyzer } from "./audioAnalysis";
+import { useRef, useState, useEffect, useCallback } from "react";
+import WaveSurfer from "wavesurfer.js";
 import "./App.css";
+
+// Utility function to convert AudioBuffer to WAV blob
+function audioBufferToWav(buffer) {
+  const length = buffer.length;
+  const sampleRate = buffer.sampleRate;
+  const arrayBuffer = new ArrayBuffer(44 + length * 2);
+  const view = new DataView(arrayBuffer);
+  
+  // WAV header
+  const writeString = (offset, string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+  
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + length * 2, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, length * 2, true);
+  
+  // Convert float samples to 16-bit PCM
+  const channelData = buffer.getChannelData(0);
+  let offset = 44;
+  for (let i = 0; i < length; i++) {
+    const sample = Math.max(-1, Math.min(1, channelData[i]));
+    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+    offset += 2;
+  }
+  
+  return new Blob([arrayBuffer], { type: 'audio/wav' });
+}
 
 export default function Waveform({
   progress = 0,
@@ -9,66 +49,165 @@ export default function Waveform({
   onScrub,
   onLoopChange,
   videoId = null,
-  youtubePlayer = null,
 }) {
-  const ref = useRef(null);
+  const containerRef = useRef(null);
+  const wavesurferRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragType, setDragType] = useState(null);
-  const [waveformData, setWaveformData] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
-  
+  console.log('🎯 Waveform component rendered with:', { videoId, duration, progress });
+  console.log('🎯 Container ref current:', !!containerRef.current);
+  console.log('🎯 WaveSurfer ref current:', !!wavesurferRef.current);
+
+  // Initialize WaveSurfer when component mounts
   useEffect(() => {
-    if (!videoId) return;
-
-    setIsAnalyzing(true);
+    if (!containerRef.current) {
+      console.log('Container not ready yet');
+      return;
+    }
     
-    const analyzeAudio = async () => {
-      try {
-        let data;
-        
-        
-        if (youtubePlayer) {
-          data = await audioAnalyzer.analyzeFromYouTubePlayer(youtubePlayer);
-        } else {
-          
-          data = await audioAnalyzer.analyzeYouTubeVideo(videoId);
+    if (wavesurferRef.current) {
+      console.log('WaveSurfer already exists');
+      return;
+    }
+
+    console.log('Initializing WaveSurfer...');
+    console.log('Container element:', containerRef.current);
+    
+    try {
+      const wavesurfer = WaveSurfer.create({
+        container: containerRef.current,
+        waveColor: "#ff0a9c",
+        progressColor: "#ff1aac",
+        height: 180,
+        normalize: true,
+        interact: true,
+        dragToSeek: true,
+      });
+
+      console.log('WaveSurfer created:', wavesurfer);
+      wavesurferRef.current = wavesurfer;
+
+      // Set ready immediately since WaveSurfer is initialized
+      console.log('✅ Setting WaveSurfer as ready immediately');
+      setIsReady(true);
+
+      wavesurfer.on('ready', () => {
+        console.log('✅ WaveSurfer ready event fired!');
+        console.log('Container contents:', containerRef.current?.innerHTML);
+        console.log('Container children:', containerRef.current?.children);
+      });
+
+      wavesurfer.on('error', (error) => {
+        console.error('❌ WaveSurfer error:', error);
+      });
+      
+      wavesurfer.on('load', () => {
+        console.log('🎵 WaveSurfer audio loaded');
+      });
+      
+      wavesurfer.on('waveform-ready', () => {
+        console.log('🌊 WaveSurfer waveform ready');
+      });
+
+      // Load a real, working audio file immediately
+      console.log('Loading real audio file to trigger waveform...');
+      
+      // Try multiple reliable audio sources
+      const testUrls = [
+        'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
+        'https://samplelib.com/lib/preview/mp3/sample-3s.mp3',
+        'https://file-examples.com/storage/fe86a1f2d4c3b2b5d5f4b2b/2017/11/file_example_WAV_1MG.wav'
+      ];
+      
+      const tryLoadAudio = async (urls) => {
+        for (const url of urls) {
+          try {
+            console.log(`🎵 Trying to load: ${url}`);
+            await wavesurfer.load(url);
+            console.log(`✅ Successfully loaded: ${url}`);
+            return true;
+          } catch (error) {
+            console.warn(`❌ Failed to load ${url}:`, error);
+          }
         }
-        
-        setWaveformData(data);
-      } catch (error) {
-        console.warn('Audio analysis failed, using fallback:', error);
-        setWaveformData(audioAnalyzer.generateFallbackWaveform());
-      } finally {
-        setIsAnalyzing(false);
+        return false;
+      };
+      
+      tryLoadAudio(testUrls).then((success) => {
+        if (!success) {
+          console.error('❌ All audio URLs failed to load');
+        }
+      });
+
+    } catch (createError) {
+      console.error('❌ Failed to create WaveSurfer:', createError);
+    }
+
+    return () => {
+      if (wavesurferRef.current) {
+        console.log('Destroying WaveSurfer...');
+        try {
+          wavesurferRef.current.destroy();
+        } catch (destroyError) {
+          console.warn('Error destroying WaveSurfer:', destroyError);
+        }
+        wavesurferRef.current = null;
+        setIsReady(false);
+      }
+    };
+  }, []);
+
+  console.log('WaveSurfer state:', { wavesurfer: !!wavesurferRef.current, isReady });
+
+
+  // This useEffect is now disabled since we load audio immediately on initialization
+  // useEffect(() => {
+  //   // Audio loading is now handled in the initialization useEffect
+  // }, [videoId, isReady]);
+
+  // Sync playback position
+  useEffect(() => {
+    if (!wavesurferRef.current || !isReady) return;
+
+    const currentTime = progress * duration;
+    if (Math.abs(wavesurferRef.current.getCurrentTime() - currentTime) > 0.5) {
+      wavesurferRef.current.setTime(currentTime);
+    }
+  }, [progress, duration, isReady]);
+
+  // Handle wavesurfer events
+  useEffect(() => {
+    if (!wavesurferRef.current) return;
+
+    const onSeek = (currentTime) => {
+      if (duration > 0) {
+        const ratio = currentTime / duration;
+        onScrub?.(ratio);
       }
     };
 
-    analyzeAudio();
-  }, [videoId, youtubePlayer]);
+    wavesurferRef.current.on('seek', onSeek);
+    wavesurferRef.current.on('click', onSeek);
 
-  const shape = useMemo(() => {
-    const W = 740;
-    const H = 180;
+    return () => {
+      if (wavesurferRef.current) {
+        wavesurferRef.current.un('seek', onSeek);
+        wavesurferRef.current.un('click', onSeek);
+      }
+    };
+  }, [duration, onScrub, isReady]);
 
-    
-    if (waveformData && waveformData.length > 0) {
-      return audioAnalyzer.convertToSVGPath(waveformData, W, H);
-    }
-
-    
-    const fallbackData = audioAnalyzer.generateFallbackWaveform();
-    return audioAnalyzer.convertToSVGPath(fallbackData, W, H);
-  }, [waveformData]);
-
-  const toRatio = (clientX) => {
-    const box = ref.current?.getBoundingClientRect();
+  const toRatio = useCallback((clientX) => {
+    const box = containerRef.current?.getBoundingClientRect();
     if (!box) return 0;
     const x = Math.min(Math.max(clientX - box.left, 0), box.width);
     return x / box.width;
-  };
+  }, []);
 
-  const handleMouseDown = (e, type) => {
+  const handleMouseDown = useCallback((e, type) => {
     e.preventDefault();
     setIsDragging(true);
     setDragType(type);
@@ -77,9 +216,9 @@ export default function Waveform({
       const r = toRatio(e.clientX);
       onScrub?.(r);
     }
-  };
+  }, [toRatio, onScrub]);
 
-  const handleMouseMove = (e) => {
+  const handleMouseMove = useCallback((e) => {
     if (!isDragging) return;
 
     const r = toRatio(e.clientX);
@@ -94,12 +233,12 @@ export default function Waveform({
         onLoopChange?.({ ...loop, b: t });
       }
     }
-  };
+  }, [isDragging, dragType, toRatio, duration, loop, onScrub, onLoopChange]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     setIsDragging(false);
     setDragType(null);
-  };
+  }, []);
 
   const startPos = (loop?.a ?? 0) / duration;
   const endPos = (loop?.b ?? 1) / duration;
@@ -107,90 +246,100 @@ export default function Waveform({
   return (
     <div
       className="waveform-wrapper"
-      ref={ref}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      style={{ position: 'relative' }}
     >
-      <svg
-        className="waveform-svg"
-        viewBox={`0 0 ${shape.W} ${shape.H}`}
-        preserveAspectRatio="none"
-      >
-        <defs>
-          <linearGradient
-            id="waveform-gradient"
-            x1="0%"
-            y1="0%"
-            x2="0%"
-            y2="100%"
-          >
-            <stop offset="0%" stopColor="#ff0a9c" stopOpacity="0.9" />
-            <stop offset="50%" stopColor="#c026d3" stopOpacity="1" />
-            <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.9" />
-          </linearGradient>
+      {/* WaveSurfer container */}
+      <div 
+        ref={containerRef} 
+        style={{ 
+          width: '100%', 
+          height: '180px',
+          opacity: isLoading ? 0.5 : 1,
+          transition: 'opacity 0.3s ease',
+          backgroundColor: 'rgba(255, 0, 0, 0.1)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          cursor: 'pointer',
+        }}
+        onClick={() => {
+          console.log('🔍 DEBUGGING WaveSurfer state:');
+          console.log('📦 Container element:', containerRef.current);
+          console.log('📦 Container HTML:', containerRef.current?.innerHTML);
+          console.log('📦 Container children count:', containerRef.current?.children?.length || 0);
+          
+          // List all child elements
+          if (containerRef.current?.children) {
+            console.log('👶 Container children:');
+            for (let i = 0; i < containerRef.current.children.length; i++) {
+              const child = containerRef.current.children[i];
+              console.log(`   Child ${i}:`, child.tagName, child.className, child);
+            }
+          }
+          
+          console.log('🌊 WaveSurfer object:', wavesurferRef.current);
+          
+          if (wavesurferRef.current) {
+            console.log('🌊 WaveSurfer methods available:', Object.keys(wavesurferRef.current));
+            
+            // Try to get current state
+            try {
+              console.log('📊 WaveSurfer isReady:', wavesurferRef.current.isReady);
+            } catch (e) {
+              console.log('❌ Could not check isReady:', e);
+            }
+            
+            // Try to load a simple test file
+            console.log('🎵 Attempting to load test audio...');
+            wavesurferRef.current.loadBlob(new Blob([new ArrayBuffer(1024)], { type: 'audio/wav' }))
+              .then(() => {
+                console.log('✅ Blob loaded successfully!');
+                console.log('📦 Container after blob load:', containerRef.current?.innerHTML);
+              })
+              .catch((error) => {
+                console.error('❌ Blob load failed:', error);
+              });
+          }
+        }} 
+      />
 
-          <clipPath id="progress-clip">
-            <rect x="0" y="0" width={shape.W * progress} height={shape.H} />
-          </clipPath>
+      {/* Loading indicator */}
+      {isLoading && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            color: 'rgba(255,255,255,0.7)',
+            fontSize: '14px',
+            fontFamily: 'Inter, sans-serif',
+            pointerEvents: 'none',
+            zIndex: 10
+          }}
+        >
+          Loading waveform...
+        </div>
+      )}
 
-          <mask id="loop-mask">
-            <rect x="0" y="0" width={shape.W} height={shape.H} fill="white" />
-            <rect
-              x={shape.W * startPos}
-              y="0"
-              width={shape.W * (endPos - startPos)}
-              height={shape.H}
-              fill="black"
-            />
-          </mask>
-        </defs>
-
-        
-        <path d={shape.d} fill="rgba(255,255,255,0.1)" stroke="none" />
-
-        
-        <path
-          d={shape.d}
-          fill="url(#waveform-gradient)"
-          stroke="none"
-          clipPath="url(#progress-clip)"
-          opacity={isAnalyzing ? 0.5 : 1}
+      {/* Loop region overlay */}
+      {loop && duration > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: `${startPos * 100}%`,
+            width: `${(endPos - startPos) * 100}%`,
+            height: '100%',
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            pointerEvents: 'none',
+            zIndex: 5
+          }}
         />
+      )}
 
-        
-        {isAnalyzing && (
-          <text
-            x={shape.W / 2}
-            y={shape.mid}
-            textAnchor="middle"
-            fill="rgba(255,255,255,0.7)"
-            fontSize="14"
-            fontFamily="Inter, sans-serif"
-          >
-            Analyzing audio...
-          </text>
-        )}
-
-        
-        <path
-          d={shape.d}
-          fill="rgba(0,0,0,0.5)"
-          stroke="none"
-          mask="url(#loop-mask)"
-        />
-      </svg>
-
-      
-      <div
-        className="waveform-scrubber"
-        style={{ left: `${progress * 100}%` }}
-        onMouseDown={(e) => handleMouseDown(e, "scrub")}
-      >
-        <div className="scrubber-line" />
-      </div>
-
-      
+      {/* Clip handles */}
       <div
         className="waveform-clip-handle start"
         style={{ left: `${startPos * 100}%` }}
@@ -199,7 +348,6 @@ export default function Waveform({
         <div className="clip-handle-cap" />
       </div>
 
-      
       <div
         className="waveform-clip-handle end"
         style={{ left: `${endPos * 100}%` }}
