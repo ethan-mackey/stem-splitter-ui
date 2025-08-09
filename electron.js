@@ -1,4 +1,4 @@
-// main.js (CommonJS)
+// electron.js (CommonJS)
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const os = require("os");
@@ -19,20 +19,19 @@ function createWindow() {
     minWidth: PILL_W,
     minHeight: PILL_H,
     useContentSize: true,
-    frame: false, // no OS chrome
-    transparent: true, // let your CSS draw the pill
+    frame: false,
+    transparent: true,
     resizable: false,
     show: true,
     backgroundColor: "#00000000",
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, "preload.js"), // <-- this preload must be here
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
     },
   });
 
-  // DEV/PROD loading (supports Vite dev server if present)
   const devUrl =
     process.env.VITE_DEV_SERVER_URL ||
     process.env.ELECTRON_RENDERER_URL ||
@@ -41,14 +40,12 @@ function createWindow() {
   if (devUrl) {
     win.loadURL(devUrl);
   } else {
-    // Adjust if your built index is in another folder (e.g., dist/index.html)
     win.loadFile(path.join(__dirname, "index.html"));
   }
 }
 
 app.whenReady().then(() => {
   createWindow();
-
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -58,24 +55,16 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-/**
- * Resize window when results/dashboard open/close.
- * Matches your App.jsx calls to window.electronAPI.
- */
+// Resize window when results/dashboard open/close
 ipcMain.on("results-opened", (_evt, { height }) => {
   const totalHeight = PILL_H + GAP + (height || 0);
   win?.setContentSize(PILL_W, totalHeight);
 });
-
 ipcMain.on("results-closed", () => {
   win?.setContentSize(PILL_W, PILL_H);
 });
 
-/**
- * Return raw bytes (ArrayBuffer) of the highest-quality audio stream
- * so the renderer can create a Blob and feed WaveSurfer.
- * Called via preload: window.audioAPI.downloadAudioForVideo(videoId)
- */
+// Return raw bytes of the highest-quality audio stream (ytdl-core)
 ipcMain.handle("download-audio-for-video", async (_evt, { videoId }) => {
   if (!videoId) throw new Error("Missing videoId");
 
@@ -101,7 +90,7 @@ ipcMain.handle("download-audio-for-video", async (_evt, { videoId }) => {
     const stream = ytdl.downloadFromInfo(info, {
       quality: "highestaudio",
       filter: "audioonly",
-      highWaterMark: 1 << 25, // bigger buffer
+      highWaterMark: 1 << 25,
     });
     const out = fs.createWriteStream(tmpPath);
     stream.pipe(out);
@@ -115,8 +104,11 @@ ipcMain.handle("download-audio-for-video", async (_evt, { videoId }) => {
     fs.unlinkSync(tmpPath);
   } catch {}
 
-  // Convert Node Buffer -> ArrayBuffer for structured clone back to renderer
-  const arrayBuffer = Buffer.from(buf).buffer;
+  // IMPORTANT: slice correctly so we don't return a huge backing buffer
+  const arrayBuffer = buf.buffer.slice(
+    buf.byteOffset,
+    buf.byteOffset + buf.byteLength
+  );
 
   return { mime, data: arrayBuffer };
 });

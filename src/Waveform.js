@@ -3,170 +3,209 @@ import WaveSurfer from "wavesurfer.js";
 import { audioAnalyzer } from "./audioAnalysis";
 import "./App.css";
 
-// === Helper: AudioBuffer -> WAV Blob (your original helper, kept) ===
-function audioBufferToWav(buffer) {
-  const length = buffer.length;
-  const sampleRate = buffer.sampleRate;
-  const arrayBuffer = new ArrayBuffer(44 + length * 2);
-  const view = new DataView(arrayBuffer);
-
-  const writeString = (offset, string) => {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
-    }
-  };
-
-  writeString(0, "RIFF");
-  view.setUint32(4, 36 + length * 2, true);
-  writeString(8, "WAVE");
-  writeString(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  writeString(36, "data");
-  view.setUint32(40, length * 2, true);
-
-  const channelData = buffer.getChannelData(0);
-  let offset = 44;
-  for (let i = 0; i < length; i++) {
-    const sample = Math.max(-1, Math.min(1, channelData[i]));
-    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
-    offset += 2;
-  }
-
-  return new Blob([arrayBuffer], { type: "audio/wav" });
-}
-
+/**
+ * Props:
+ *  - progress: number 0..1 (from YouTube player)
+ *  - duration: number seconds (YouTube duration; used by loop UI)
+ *  - loop: {a:number,b:number}|null
+ *  - onScrub(ratio 0..1): parent will seek YT to ratio * youtubeDuration
+ *  - onLoopChange(newLoop)
+ *  - videoId: string (YouTube ID)
+ *  - onAudioLoaded?: (blob: Blob) => void  // called when a WAV blob is ready
+ */
 export default function Waveform({
   progress = 0,
   duration = 0,
   loop = null,
   onScrub,
   onLoopChange,
-  videoId = null, // <-- we now actually use this
+  videoId = null,
+  onAudioLoaded,
 }) {
   const containerRef = useRef(null);
-  const wavesurferRef = useRef(null);
+  const wsRef = useRef(null);
+
   const [isDragging, setIsDragging] = useState(false);
   const [dragType, setDragType] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isReady, setIsReady] = useState(false);
   const [loadError, setLoadError] = useState(null);
+  const [wsDuration, setWsDuration] = useState(0); // WaveSurfer’s true duration
 
-  // Create WaveSurfer once
+  const onScrubRef = useRef(onScrub);
+  const onAudioLoadedRef = useRef(onAudioLoaded);
+
+  // keep latest callbacks in refs
   useEffect(() => {
-    if (!containerRef.current || wavesurferRef.current) return;
+    onScrubRef.current = onScrub;
+  }, [onScrub]);
+  useEffect(() => {
+    onAudioLoadedRef.current = onAudioLoaded;
+  }, [onAudioLoaded]);
+
+  // build WaveSurfer once
+  useEffect(() => {
+    if (!containerRef.current || wsRef.current) return;
 
     try {
-      const wavesurfer = WaveSurfer.create({
+      const ws = WaveSurfer.create({
         container: containerRef.current,
         waveColor: "#ff0a9c",
         progressColor: "#ff1aac",
         height: 180,
-        normalize: true,
+        normalize: false, // keep real amplitudes
         interact: true,
         dragToSeek: true,
+        partialRender: true,
+        barWidth: 3,
+        barGap: 1,
+        barRadius: 3,
       });
 
-      wavesurfer.on("ready", () => {
-        setIsReady(true);
+      ws.on("ready", () => {
+        setWsDuration(ws.getDuration() || 0);
         setLoadError(null);
       });
 
-      wavesurfer.on("error", (error) => {
-        console.error("WaveSurfer error:", error);
-        setLoadError("Failed to render waveform.");
+      ws.on("error", (e) => {
+        console.error("WaveSurfer error:", e);
+        setLoadError("Waveform render error.");
       });
 
-      wavesurfer.on("seek", (ratio) => {
-        onScrub?.(ratio);
+      ws.on("seek", (ratio) => {
+        // WaveSurfer ratio should directly correspond to YouTube ratio
+        // since both represent the same audio content
+        onScrubRef.current?.(ratio);
       });
 
-      wavesurferRef.current = wavesurfer;
+      wsRef.current = ws;
     } catch (e) {
       console.error("Failed to create WaveSurfer:", e);
       setLoadError("Audio renderer failed to initialize.");
     }
 
     return () => {
-      if (wavesurferRef.current) {
+      if (wsRef.current) {
         try {
-          wavesurferRef.current.destroy();
+          wsRef.current.destroy();
         } catch {}
-        wavesurferRef.current = null;
+        wsRef.current = null;
       }
-      setIsReady(false);
+      setWsDuration(0);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cache for analyzed audio buffers
-  const audioBufferCache = useRef({});
-
-  // Load real audio for the selected video, with caching
+  // download + decode + load (instead of loading remote URL directly)
   useEffect(() => {
     let cancelled = false;
+    const ws = wsRef.current;
+    if (!ws || !videoId) return;
 
-    async function loadForVideo(id) {
-      if (!wavesurferRef.current || !id) return;
-
+    async function load() {
       setIsLoading(true);
-      setIsReady(false);
       setLoadError(null);
+      console.log("Loading waveform for video:", videoId);
 
-      try {
-        let buffer = audioBufferCache.current[id];
-        if (!buffer) {
-          // Use *your* analyzer to find & decode the audio
-          await audioAnalyzer.analyzeYouTubeVideo(id);
-          buffer = audioAnalyzer.audioBuffer;
-          if (!buffer) {
-            throw new Error("Audio buffer not available.");
-          }
-          audioBufferCache.current[id] = buffer;
-        }
+      let hasSetSpecificError = false;
 
-        const wavBlob = audioBufferToWav(buffer);
-
-        if (cancelled) return;
-        // Feed the decoded audio into WaveSurfer
-        wavesurferRef.current.loadBlob(wavBlob);
-      } catch (err) {
-        console.warn("Could not load audio for video:", err);
-        if (!cancelled) {
+      // 1) Electron native pipeline (if you exposed it): returns raw bytes
+      if (window.audioAPI?.downloadAudioForVideo) {
+        try {
+          console.log("Trying Electron audioAPI for video:", videoId);
+          const { mime, data } = await window.audioAPI.downloadAudioForVideo(
+            videoId
+          );
+          if (cancelled) return;
+          const blob = new Blob([data], { type: mime || "audio/webm" });
+          console.log("Electron audioAPI success — size:", blob.size, "bytes");
+          ws.loadBlob(blob);
+          onAudioLoadedRef.current?.(blob);
+          setIsLoading(false);
+          return;
+        } catch (e) {
+          console.error("Electron audioAPI failed:", e);
           setLoadError(
-            "Could not fetch audio for this video (CORS/YouTube blocking)."
+            `Electron download failed: ${e.message || "Unknown error"}`
+          );
+          hasSetSpecificError = true;
+        }
+      }
+
+      // 2) Piped URL → fetch bytes → decode → convert to WAV blob → load
+      try {
+        console.log("Trying Piped API for video:", videoId);
+        const pipedUrl = await audioAnalyzer.getYouTubeAudioUrl(videoId);
+        if (cancelled) return;
+
+        if (pipedUrl) {
+          console.log("Piped URL acquired; downloading & decoding…");
+          try {
+            const audioBuffer = await audioAnalyzer.fetchAndDecodeAudio(
+              pipedUrl
+            );
+            if (cancelled) return;
+
+            const wavBlob = audioAnalyzer.audioBufferToWav(audioBuffer);
+            console.log("Decoded & converted to WAV:", wavBlob.size, "bytes");
+
+            ws.loadBlob(wavBlob);
+            onAudioLoadedRef.current?.(wavBlob);
+            setIsLoading(false);
+            return;
+          } catch (decodeError) {
+            console.error("Download/decode failed:", decodeError);
+            setLoadError(
+              `Failed to download or decode audio stream: ${
+                decodeError.message || decodeError
+              }`
+            );
+            hasSetSpecificError = true;
+          }
+        } else {
+          setLoadError("No audio streams available from Piped API");
+          hasSetSpecificError = true;
+        }
+      } catch (e) {
+        console.error("Piped path failed:", e);
+        setLoadError(`Piped API failed: ${e.message || "Network error"}`);
+        hasSetSpecificError = true;
+      }
+
+      // 3) Final attempt: show clear error instead of fake waveform
+      console.log("All audio sources failed - cannot generate accurate waveform");
+      if (!cancelled) {
+        if (!hasSetSpecificError) {
+          setLoadError(
+            "Unable to extract audio from this YouTube video. This may be due to: (1) Copyright restrictions, (2) Geo-blocking, (3) Private/age-restricted video, or (4) Temporary YouTube API issues. Try a different public video (music tracks from independent artists often work best) or check back later."
           );
         }
-      } finally {
-        if (!cancelled) setIsLoading(false);
+        setIsLoading(false);
+        // Don't load any waveform - leave it empty to make it clear audio isn't available
       }
     }
 
-    loadForVideo(videoId);
-
+    load();
     return () => {
       cancelled = true;
     };
-  }, [videoId]);
+  }, [videoId, duration]);
 
-  // Keep external progress/duration in sync if you use them
+  // keep the waveform cursor in sync with YT progress
   useEffect(() => {
-    if (!wavesurferRef.current || !isReady || !duration) return;
-
-    const targetTime = progress * duration;
-    const current = wavesurferRef.current.getCurrentTime?.() ?? 0;
-
-    if (Math.abs(current - targetTime) > 0.5) {
-      wavesurferRef.current.setTime(targetTime);
+    const ws = wsRef.current;
+    if (!ws || !wsDuration || isDragging) return;
+    
+    // Use progress ratio to set waveform time directly
+    // progress is 0-1 ratio, multiply by waveform's actual duration
+    const targetTime = (progress || 0) * wsDuration;
+    const currentTime = ws.getCurrentTime?.() ?? 0;
+    
+    // Only update if there's a significant difference (avoid jitter)
+    if (Math.abs(currentTime - targetTime) > 0.25) {
+      ws.setTime(targetTime);
     }
-  }, [progress, duration, isReady]);
+  }, [progress, wsDuration, isDragging]);
 
-  // Drag logic (unchanged)
+  // ---------- scrub/loop UI ----------
   const toRatio = useCallback((clientX) => {
     const box = containerRef.current?.getBoundingClientRect();
     if (!box) return 0;
@@ -179,30 +218,26 @@ export default function Waveform({
       e.preventDefault();
       setIsDragging(true);
       setDragType(type);
-
       if (type === "scrub") {
         const r = toRatio(e.clientX);
         onScrub?.(r);
       }
     },
-    [toRatio, onScrub]
+    [onScrub, toRatio]
   );
 
   const handleMouseMove = useCallback(
     (e) => {
       if (!isDragging) return;
-
       const r = toRatio(e.clientX);
-
       if (dragType === "scrub") {
         onScrub?.(r);
       } else if (dragType === "start" || dragType === "end") {
-        const t = r * duration;
-        if (dragType === "start") {
-          onLoopChange?.({ ...loop, a: t });
-        } else {
-          onLoopChange?.({ ...loop, b: t });
-        }
+        // Convert waveform position ratio to YouTube time
+        const ytTime = r * (duration || 0);
+        onLoopChange?.(
+          dragType === "start" ? { ...loop, a: ytTime } : { ...loop, b: ytTime }
+        );
       }
     },
     [isDragging, dragType, toRatio, duration, loop, onScrub, onLoopChange]
@@ -213,8 +248,9 @@ export default function Waveform({
     setDragType(null);
   }, []);
 
-  const startPos = (loop?.a ?? 0) / duration || 0;
-  const endPos = (loop?.b ?? 1) / duration || 1;
+  // Loop positions as ratios of the total duration
+  const startPos = (loop?.a ?? 0) / (duration || 1);
+  const endPos = (loop?.b ?? duration ?? 1) / (duration || 1);
 
   return (
     <div
@@ -224,7 +260,6 @@ export default function Waveform({
       onMouseLeave={handleMouseUp}
       style={{ position: "relative" }}
     >
-      {/* WaveSurfer container */}
       <div
         ref={containerRef}
         style={{
@@ -232,16 +267,14 @@ export default function Waveform({
           height: "180px",
           opacity: isLoading ? 0.5 : 1,
           transition: "opacity 0.3s ease",
-          // NOTE: I did NOT change your CSS classes; these inline styles were already here.
           backgroundColor: "rgba(255, 0, 0, 0.1)",
           border: "1px solid rgba(255, 255, 255, 0.3)",
           cursor: "pointer",
           position: "relative",
-          zIndex: 2, // keeps canvas visible if your ::before overlay is on z-index:1
+          zIndex: 2,
         }}
       />
 
-      {/* Loading indicator */}
       {isLoading && (
         <div
           style={{
@@ -250,7 +283,7 @@ export default function Waveform({
             left: "50%",
             transform: "translate(-50%, -50%)",
             color: "rgba(255,255,255,0.7)",
-            fontSize: "14px",
+            fontSize: 14,
             fontFamily: "Inter, sans-serif",
             pointerEvents: "none",
             zIndex: 10,
@@ -260,25 +293,29 @@ export default function Waveform({
         </div>
       )}
 
-      {/* Error banner (non-blocking) */}
       {loadError && (
         <div
           style={{
             position: "absolute",
-            bottom: 8,
-            left: 8,
-            right: 8,
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
             color: "#ff6b6b",
             fontFamily: "Inter, sans-serif",
-            fontSize: 12,
+            fontSize: 14,
+            textAlign: "center",
             pointerEvents: "none",
+            backgroundColor: "rgba(0,0,0,0.8)",
+            padding: "12px 16px",
+            borderRadius: "8px",
+            maxWidth: "80%",
+            lineHeight: "1.4",
           }}
         >
-          {loadError}
+          ⚠️ {loadError}
         </div>
       )}
 
-      {/* Loop region overlay */}
       {loop && duration > 0 && (
         <div
           style={{
@@ -294,7 +331,6 @@ export default function Waveform({
         />
       )}
 
-      {/* Clip handles */}
       <div
         className="waveform-clip-handle start"
         style={{ left: `${startPos * 100}%` }}
@@ -302,7 +338,6 @@ export default function Waveform({
       >
         <div className="clip-handle-cap" />
       </div>
-
       <div
         className="waveform-clip-handle end"
         style={{ left: `${endPos * 100}%` }}

@@ -34,18 +34,178 @@ export class AudioAnalyzer {
     }
   }
 
+  // Test function to check if Piped API works with a known video
+  async testPipedAPI() {
+    const testVideoId = 'dQw4w9WgXcQ'; // Rick Astley - Never Gonna Give You Up (should always work)
+    console.log('Testing Piped API with known working video:', testVideoId);
+    return await this.getYouTubeAudioUrl(testVideoId);
+  }
+
+  // Check status of audio extraction services
+  async checkServiceStatus() {
+    console.log('Checking audio extraction service status...');
+    const result = await this.testPipedAPI();
+    if (result) {
+      console.log('✅ Audio extraction services are working');
+      return { status: 'working', message: 'Services operational' };
+    } else {
+      console.log('❌ Audio extraction services are currently unavailable');
+      return { 
+        status: 'unavailable', 
+        message: 'Third-party YouTube audio extraction services (Piped/Invidious) are currently experiencing issues. This is common and usually resolves within a few hours. Try again later or use videos from independent creators which are less likely to be geo-blocked.' 
+      };
+    }
+  }
+
   async getYouTubeAudioUrl(videoId) {
-    try {
-      const apiUrl = `https://piped.video/streams/${videoId}`;
-      const response = await fetch(apiUrl);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+    // Updated list of Piped instances (as of 2024-2025) with more reliable ones first
+    const pipedInstances = [
+      'https://pipedapi.syncpundit.io',
+      'https://pipedapi.palvelukeskus.eu', 
+      'https://api-piped.mha.fi',
+      'https://pipedapi.smnz.de',
+      'https://pipedapi.privacy.com.de',
+      'https://api.piped.privacydev.net',
+      'https://pipedapi.kavin.rocks',
+      'https://pipedapi.leptons.xyz', 
+      'https://api.piped.yt',
+      'https://pipedapi-libre.kavin.rocks',
+      'https://piapi.ggtyler.dev',
+      'https://pipedapi.adminforge.de',
+      'https://api.piped.projectsegfau.lt'
+    ];
+
+    for (const instance of pipedInstances) {
+      try {
+        const apiUrl = `${instance}/streams/${videoId}`;
+        console.log("Trying Piped instance:", apiUrl);
+        
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout (faster failover)
+        
+        const response = await fetch(apiUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+          },
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeout);
+        
+        if (!response.ok) {
+          console.warn(`Piped instance ${instance} failed: HTTP ${response.status} - ${response.statusText}`);
+          continue;
+        }
+        
+        const data = await response.json();
+        
+        // Try to find any available audio stream (prefer lower quality for compatibility)
+        const audioStreams = data?.audioStreams || [];
+        console.log(`Found ${audioStreams.length} audio streams from ${instance}`);
+        
+        if (audioStreams.length > 0) {
+          // Sort by quality (prefer webm format and lower bitrates for better compatibility)
+          const sortedStreams = audioStreams.sort((a, b) => {
+            // Prefer webm over m4a/mp4
+            if (a.mimeType?.includes('webm') && !b.mimeType?.includes('webm')) return -1;
+            if (!a.mimeType?.includes('webm') && b.mimeType?.includes('webm')) return 1;
+            // Then prefer lower bitrate (more compatible)
+            return (a.bitrate || 0) - (b.bitrate || 0);
+          });
+          
+          const audio = sortedStreams[0]?.url;
+          if (audio) {
+            console.log("Successfully got audio URL from", instance, ":", audio, 
+                       "- format:", sortedStreams[0].mimeType, "- bitrate:", sortedStreams[0].bitrate);
+            return audio;
+          }
+        }
+        
+        console.warn("No usable audio streams found in response from", instance);
+        if (data?.error) {
+          console.warn("API error:", data.error);
+        } else {
+          console.warn("Response structure:", {
+            hasAudioStreams: !!data?.audioStreams,
+            streamCount: data?.audioStreams?.length || 0,
+            videoTitle: data?.title,
+            duration: data?.duration
+          });
+        }
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          console.warn(`Piped instance ${instance} timed out after 5 seconds`);
+        } else {
+          console.warn(`Error with Piped instance ${instance}:`, error.message || error);
+        }
+        continue;
       }
-      const data = await response.json();
-      const audio = data?.audioStreams?.[0]?.url;
-      return audio || null;
+    }
+    
+    console.warn("All Piped instances failed for video:", videoId);
+    
+    // Try alternative method using YouTube's iframe player API
+    console.log("Attempting alternative YouTube audio extraction...");
+    return await this.getYouTubeAudioUrlAlternative(videoId);
+  }
+
+  async getYouTubeAudioUrlAlternative(videoId) {
+    try {
+      // Try using Invidious instances as alternative
+      const invidiousInstances = [
+        'https://inv.nadeko.net',
+        'https://invidious.snopyta.org',
+        'https://yewtu.be',
+        'https://invidious.kavin.rocks',
+        'https://vid.puffyan.us'
+      ];
+
+      for (const instance of invidiousInstances) {
+        try {
+          console.log(`Trying Invidious instance: ${instance}`);
+          const apiUrl = `${instance}/api/v1/videos/${videoId}`;
+          
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 5000);
+          
+          const response = await fetch(apiUrl, {
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+            }
+          });
+          
+          clearTimeout(timeout);
+          
+          if (!response.ok) {
+            console.warn(`Invidious instance ${instance} failed: HTTP ${response.status}`);
+            continue;
+          }
+          
+          const data = await response.json();
+          const audioFormats = data?.adaptiveFormats?.filter(f => 
+            f.type?.includes('audio') && f.url
+          ) || [];
+          
+          if (audioFormats.length > 0) {
+            // Prefer webm audio formats
+            const webmAudio = audioFormats.find(f => f.type?.includes('webm'));
+            const selectedFormat = webmAudio || audioFormats[0];
+            console.log(`Found audio from Invidious: ${selectedFormat.url}`);
+            return selectedFormat.url;
+          }
+          
+        } catch (error) {
+          console.warn(`Invidious instance ${instance} error:`, error.message);
+          continue;
+        }
+      }
+      
+      console.warn("All Invidious instances failed");
+      return null;
+      
     } catch (error) {
-      console.warn("Failed to extract audio URL:", error);
+      console.warn("Alternative audio extraction failed:", error);
       return null;
     }
   }
@@ -189,6 +349,49 @@ export class AudioAnalyzer {
     d += " Z";
 
     return { d, W: width, H: height, mid };
+  }
+
+  // Convert AudioBuffer to WAV blob for WaveSurfer
+  audioBufferToWav(buffer) {
+    const length = buffer.length;
+    const numberOfChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const arrayBuffer = new ArrayBuffer(44 + length * numberOfChannels * 2);
+    const view = new DataView(arrayBuffer);
+    
+    // WAV header
+    const writeString = (offset, string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+    
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + length * numberOfChannels * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numberOfChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+    view.setUint16(32, numberOfChannels * 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, length * numberOfChannels * 2, true);
+    
+    // Write audio data
+    let offset = 44;
+    for (let i = 0; i < length; i++) {
+      for (let channel = 0; channel < numberOfChannels; channel++) {
+        const sample = buffer.getChannelData(channel)[i];
+        const intSample = Math.max(-1, Math.min(1, sample)) * 0x7FFF;
+        view.setInt16(offset, intSample, true);
+        offset += 2;
+      }
+    }
+    
+    return new Blob([arrayBuffer], { type: 'audio/wav' });
   }
 }
 

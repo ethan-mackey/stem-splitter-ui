@@ -23,6 +23,9 @@ export default function DashboardView({ video, onBack }) {
     other: false,
   });
 
+  // will hold the downloaded WAV blob provided by Waveform
+  const [audioBlob, setAudioBlob] = useState(null);
+
   if (!video) return null;
 
   const audioFormatOptions = [
@@ -102,7 +105,21 @@ export default function DashboardView({ video, onBack }) {
             </div>
           </div>
 
-          <button className="split-audio-btn">SPLIT AUDIO</button>
+          <button
+            className="split-audio-btn"
+            onClick={() => {
+              if (!audioBlob) {
+                alert(
+                  "Audio not available. The waveform must load successfully before splitting. Try a different video or check if the video is geo-restricted."
+                );
+                return;
+              }
+              // example: save / upload / pass to a worker
+              console.log("Ready to process audioBlob:", audioBlob);
+            }}
+          >
+            SPLIT AUDIO
+          </button>
         </div>
 
         <div className="dash-waveform-container">
@@ -125,6 +142,10 @@ export default function DashboardView({ video, onBack }) {
               setMarkers((m) => m.filter((o) => o.id !== id))
             }
             onLoopChange={setLoop}
+            onAudioLoaded={(blob) => {
+              console.log("Dashboard received audio blob:", blob);
+              setAudioBlob(blob);
+            }}
           />
           <div className="waveform-time-right">{formatTime(duration)}</div>
 
