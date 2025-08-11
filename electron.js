@@ -20,8 +20,12 @@ const ytdl = require("ytdl-core");
 let win;
 
 // Window sizing constants to match your UI
-const PILL_W = 960;
-const PILL_H = 78;
+const PILL_W = 800;
+const PILL_H = 65;
+const RESULTS_W = 960;
+const RESULTS_H = 540;
+const DASH_W = 1900;
+const DASH_H = 1200;
 const GAP = 24;
 
 function createWindow() {
@@ -70,11 +74,24 @@ app.on("window-all-closed", () => {
 
 // Resize window when results/dashboard open/close
 ipcMain.on("results-opened", (_evt, { height }) => {
-  const totalHeight = PILL_H + GAP + (height || 0);
-  win?.setContentSize(PILL_W, totalHeight);
+  let width, windowHeight;
+  if (height === RESULTS_H) {
+    // Search results panel
+    width = RESULTS_W;
+    windowHeight = Math.max(RESULTS_H + 100, 800); // Ensure minimum window size
+  } else if (height === DASH_H) {
+    // Dashboard view
+    width = DASH_W;
+    windowHeight = DASH_H + 100; // Add some padding
+  } else {
+    // Fallback to pill size
+    width = PILL_W;
+    windowHeight = PILL_H + 100;
+  }
+  win?.setSize(width, windowHeight);
 });
 ipcMain.on("results-closed", () => {
-  win?.setContentSize(PILL_W, PILL_H);
+  win?.setSize(PILL_W, PILL_H + 50); // Small padding for pill only
 });
 
 // Helper to download the highest-quality audio stream for a given videoId

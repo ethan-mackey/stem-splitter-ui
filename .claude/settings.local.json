@@ -4,7 +4,12 @@
       "Bash(npm install:*)",
       "Bash(npm run dev:*)",
       "Bash(npm start)",
-      "WebFetch(domain:wavesurfer.xyz)"
+      "WebFetch(domain:wavesurfer.xyz)",
+      "Bash(lsof:*)",
+      "Bash(curl:*)",
+      "Bash(pkill:*)",
+      "Bash(kill:*)",
+      "Bash(npm run:*)"
     ],
     "deny": []
   }

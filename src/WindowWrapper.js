@@ -4,8 +4,11 @@ export default function WindowWrapper({ children, ...rest }) {
       {...rest}
       style={{
         position: "relative",
-        display: "inline-block", // <<< only as big as its kids
+        display: "block",
+        width: "100vw",
+        height: "100vh",
         WebkitAppRegion: "drag",
+        background: "transparent",
       }}
     >
       {children}

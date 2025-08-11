@@ -1,19 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import "./App.css";
 
-const messages = ["Type in a search", "Paste a link", "drop in a file"];
-
-function SearchBar({ onSearch }) {
-  const [index, setIndex] = useState(0);
+function SearchBar({ onSearch, loading, children }) {
   const [value, setValue] = useState("");
   const [focused, setFocused] = useState(false);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setIndex((i) => (i + 1) % messages.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
@@ -26,11 +16,7 @@ function SearchBar({ onSearch }) {
   return (
     <div className="pill-wrapper" style={{ WebkitAppRegion: "no-drag" }}>
       <div className="pill-window">
-        {!value && !focused && (
-          <span key={index} className="pill-text">
-            {messages[index]}
-          </span>
-        )}
+        {!value && !focused && children}
         <input
           className="pill-input"
           value={value}

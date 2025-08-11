@@ -109,26 +109,36 @@ export default function Waveform({
       setIsLoading(true);
       setLoadError(null);
       console.log("Loading waveform for video:", videoId);
-      try {
-        if (!window.audioAPI?.downloadAudioForVideo) {
-          throw new Error("Electron audio API not available");
+      // If Electron API is available, use it to download audio into a Blob.
+      if (window.audioAPI?.downloadAudioForVideo) {
+        try {
+          const { mime, data } = await window.audioAPI.downloadAudioForVideo(
+            videoId
+          );
+          if (cancelled) return;
+          const blob = new Blob([data], { type: mime || "audio/webm" });
+          console.log(
+            "Downloaded audio via Electron — size:",
+            blob.size,
+            "bytes"
+          );
+          ws.loadBlob(blob);
+          onAudioLoadedRef.current?.(blob);
+          setIsLoading(false);
+          return;
+        } catch (e) {
+          console.error("Electron audioAPI failed:", e);
+          setLoadError(`Failed to download audio: ${e.message || e}`);
+          setIsLoading(false);
+          return;
         }
-        // Use the Electron backend to download audio bytes via ytdl-core
-        const { mime, data } = await window.audioAPI.downloadAudioForVideo(
-          videoId
-        );
-        if (cancelled) return;
-        const blob = new Blob([data], { type: mime || "audio/webm" });
-        console.log("Downloaded audio — size:", blob.size, "bytes");
-        ws.loadBlob(blob);
-        // notify parent when audio is ready
-        onAudioLoadedRef.current?.(blob);
-        setIsLoading(false);
-      } catch (e) {
-        console.error("Failed to load audio:", e);
-        setLoadError(`Failed to download audio: ${e.message || e}`);
-        setIsLoading(false);
       }
+      // If no Electron API is present, inform the user rather than attempting a remote download
+      setLoadError(
+        "The desktop audio API is not available in this environment. Please run the application via Electron (npm run electron-dev or packaged build) so that audio can be downloaded locally."
+      );
+      setIsLoading(false);
+      return;
     }
     load();
     return () => {

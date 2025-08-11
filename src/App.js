@@ -9,10 +9,9 @@ import "./App.css";
 
 const messages = ["Type in a search", "Paste a link", "Drop in a file"];
 const PANEL_HEIGHT = 540;
-const DASHBOARD_HEIGHT = 640;
+const DASHBOARD_HEIGHT = 1200;
 
 export default function App() {
-  
   const [results, setResults] = useState([]);
   const [msgIdx, setMsgIdx] = useState(0);
   const [selected, setSelected] = useState(null);
