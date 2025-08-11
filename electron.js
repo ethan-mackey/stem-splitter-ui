@@ -1,15 +1,9 @@
 // electron.js (CommonJS)
 //
-// This file sets up the Electron main process.  It creates the BrowserWindow
+// This file sets up the Electron main process. It creates the BrowserWindow
 // for the React UI and exposes IPC handlers for downloading audio from
-// YouTube.  Two IPC commands are provided:
-//
-//  - download-audio-for-video: returns raw audio bytes for a given YouTube
-//    video ID.  The renderer calls this to obtain a Blob for WaveSurfer.
-//
-//  - download-audio-to-file: downloads audio and saves it into the user's
-//    Downloads folder.  This is useful when a persistent file is needed for
-//    further processing (e.g. splitting into stems).
+// YouTube. Additionally, it applies system vibrancy effects on supported
+// platforms so that the application window has a frosted glass background.
 
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
@@ -28,7 +22,19 @@ const DASH_W = 1900;
 const DASH_H = 1200;
 const GAP = 24;
 
+/**
+ * Create the main application window and apply vibrancy or background material
+ * effects on supported platforms. On macOS the window receives a vibrancy
+ * effect using the `under-window` material. On Windows 11 22H2+ the
+ * `acrylic` background material is applied. These effects require the
+ * window to be transparent and frameless.
+ */
 function createWindow() {
+  // Determine the current OS once when the window is created. We'll use
+  // these flags both in the BrowserWindow options and after construction.
+  const isMac = process.platform === "darwin";
+  const isWin = process.platform === "win32";
+
   win = new BrowserWindow({
     width: PILL_W,
     height: PILL_H,
@@ -39,7 +45,15 @@ function createWindow() {
     transparent: true,
     resizable: false,
     show: true,
+    // Set the background color to fully transparent. Without this the OS
+    // default window background may be visible through the vibrancy layer.
     backgroundColor: "#00000000",
+    // On macOS we can pass vibrancy and visualEffectState up-front. This
+    // ensures that the vibrancy is applied as soon as the window is shown.
+    ...(isMac && {
+      vibrancy: "under-window",
+      visualEffectState: "active",
+    }),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"), // expose APIs to renderer
       contextIsolation: true,
@@ -48,6 +62,34 @@ function createWindow() {
     },
   });
 
+  // After the window is created, we can call the platform specific APIs to
+  // fine‑tune the blur effect. The try/catch blocks guard against
+  // unsupported Electron versions or OS builds.
+  if (isMac) {
+    // setVibrancy can throw if the OS or Electron version does not support
+    // the requested material. Wrap in try/catch for graceful fallback.
+    try {
+      win.setVibrancy("under-window");
+    } catch (err) {
+      console.warn("Unable to set vibrancy:", err);
+    }
+  } else if (isWin) {
+    // setBackgroundMaterial is only available on Windows 11 22H2 or later.
+    // Check that the method exists before calling it.
+    if (typeof win.setBackgroundMaterial === "function") {
+      try {
+        win.setBackgroundMaterial("acrylic");
+      } catch (err) {
+        console.warn("Unable to set background material:", err);
+      }
+    }
+  }
+
+  // Determine which URL to load based on whether we're in dev mode or
+  // production. If running via `npm start` or `react-scripts`, the
+  // environment variables VITE_DEV_SERVER_URL, ELECTRON_RENDERER_URL, or
+  // ELECTRON_START_URL will point to the development server. Otherwise we
+  // load the built index.html file from the packaged app.
   const devUrl =
     process.env.VITE_DEV_SERVER_URL ||
     process.env.ELECTRON_RENDERER_URL ||
@@ -60,6 +102,8 @@ function createWindow() {
   }
 }
 
+// Create the window when Electron is ready. Recreate it if all windows are
+// closed and the app is activated (macOS behavior).
 app.whenReady().then(() => {
   createWindow();
   app.on("activate", () => {
@@ -146,8 +190,8 @@ ipcMain.handle("download-audio-for-video", async (_evt, { videoId }) => {
   return { mime, data: arrayBuffer };
 });
 
-// Download audio and write it to the user's downloads folder.  Returns the
-// absolute file path and mime type.  This is useful when further processing
+// Download audio and write it to the user's downloads folder. Returns the
+// absolute file path and mime type. This is useful when further processing
 // (such as stem splitting) needs a persistent file on disk.
 ipcMain.handle("download-audio-to-file", async (_evt, { videoId }) => {
   if (!videoId) throw new Error("Missing videoId");

@@ -1,6 +1,7 @@
+// src/App.js
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-
+import VibrancyMask from "./VibrancyMask";
 import WindowWrapper from "./WindowWrapper";
 import SearchBar from "./SearchBar";
 import ResultsWindow from "./ResultsWindow";
@@ -18,7 +19,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  
+  // Rotate the helper text inside the pill
   useEffect(() => {
     const id = setInterval(
       () => setMsgIdx((i) => (i + 1) % messages.length),
@@ -27,7 +28,7 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  
+  // Resize the Electron window based on what’s showing
   useEffect(() => {
     if (selected) {
       window.electronAPI?.resultsOpened(DASHBOARD_HEIGHT);
@@ -38,7 +39,7 @@ export default function App() {
     }
   }, [results.length, selected]);
 
-  
+  // YouTube Search
   const handleSearch = async (term) => {
     const q = term.trim();
     if (!q) {
@@ -53,7 +54,6 @@ export default function App() {
       const key = process.env.REACT_APP_YT_API_KEY || "";
       const base = "https://www.googleapis.com/youtube/v3";
 
-      
       const sURL = `${base}/search?part=snippet&type=video&maxResults=8&q=${encodeURIComponent(
         q
       )}${key ? `&key=${key}` : ""}`;
@@ -63,7 +63,6 @@ export default function App() {
         return;
       }
 
-      
       const ids = items.map((i) => i.id.videoId).join(",");
       const dURL = `${base}/videos?part=contentDetails&id=${ids}${
         key ? `&key=${key}` : ""
@@ -73,7 +72,6 @@ export default function App() {
         details.map((d) => [d.id, d.contentDetails.duration])
       );
 
-      
       setResults(
         items.map((i) => ({
           id: i.id.videoId,
@@ -91,34 +89,41 @@ export default function App() {
     }
   };
 
-  
   return (
-    <WindowWrapper>
-      {selected ? (
-        
-        <DashboardView video={selected} onBack={() => setSelected(null)} />
-      ) : (
-        
-        <>
-          <SearchBar onSearch={handleSearch} loading={loading}>
-            <span key={msgIdx} className="pill-text">
-              {messages[msgIdx]}
-            </span>
-          </SearchBar>
+    <>
+      {/* Reveal OS blur ONLY inside the pill. Adjust inset to hide any edge bleed. */}
+      <VibrancyMask targetSelector=".pill-window" radius={39} inset={8} />
 
-          {error && <div className="error-banner">{error}</div>}
+      {/* If later you want the results panel blurred too, uncomment this: */}
+      {/*
+      <VibrancyMask targetSelector=".results-window" radius={28} inset={8} />
+      */}
 
-          <AnimatePresence initial={false}>
-            {results.length > 0 && !loading && (
-              <ResultsWindow
-                key="results"
-                results={results}
-                onSelect={setSelected}
-              />
-            )}
-          </AnimatePresence>
-        </>
-      )}
-    </WindowWrapper>
+      <WindowWrapper>
+        {selected ? (
+          <DashboardView video={selected} onBack={() => setSelected(null)} />
+        ) : (
+          <>
+            <SearchBar onSearch={handleSearch} loading={loading}>
+              <span key={msgIdx} className="pill-text">
+                {messages[msgIdx]}
+              </span>
+            </SearchBar>
+
+            {error && <div className="error-banner">{error}</div>}
+
+            <AnimatePresence initial={false}>
+              {results.length > 0 && !loading && (
+                <ResultsWindow
+                  key="results"
+                  results={results}
+                  onSelect={setSelected}
+                />
+              )}
+            </AnimatePresence>
+          </>
+        )}
+      </WindowWrapper>
+    </>
   );
 }

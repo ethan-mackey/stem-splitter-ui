@@ -14,7 +14,7 @@ function SearchBar({ onSearch, loading, children }) {
   };
 
   return (
-    <div className="pill-wrapper" style={{ WebkitAppRegion: "no-drag" }}>
+    <div className="pill-wrapper" style={{ WebkitAppRegion: "drag" }}>
       <div className="pill-window">
         {!value && !focused && children}
         <input

@@ -14,6 +14,7 @@ export default function ResultsWindow({ results, onSelect }) {
       animate={{ height: 540, opacity: 1, y: 0 }}
       exit={{ height: 0, opacity: 0, y: -20 }}
       transition={spring}
+      style={{ WebkitAppRegion: "drag" }}
     >
       <motion.div
         className="results-grid"
