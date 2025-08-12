@@ -26,6 +26,8 @@ body {
   background: transparent;
   position: relative;
   overflow: hidden;
+  /* Ensure the content (pill and results) appears above any vibrancy masks. */
+  z-index: 1;
 }
 
 /* Center the search bar wrapper so the pill window stays centered */
@@ -63,10 +65,12 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 39px;
-  background: rgba(255,255,255,0.04);
-  backdrop-filter: blur(25px) saturate(200%) brightness(1.4);
-  -webkit-backdrop-filter: blur(25px) saturate(200%) brightness(1.4);
-
+  /* Dark frosted glass fill and blur.  Tint the pill dark and apply a blur
+     on the content behind it.  The brightness() function darkens the
+     blurred content to achieve a darker appearance. */
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(30px) saturate(180%) brightness(0.7);
+  -webkit-backdrop-filter: blur(30px) saturate(180%) brightness(0.7);
   overflow: hidden;
   /* Prevent blur bleeding into ancestors */
   isolation: isolate;
@@ -75,7 +79,7 @@ body {
   border: 2px solid transparent;
   background-clip: padding-box;
   /* Subtle shadow to lift the pill off the page without a harsh outline */
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
 /* Gradient border via pseudo element.
@@ -96,8 +100,7 @@ body {
   /* Mask the interior so only the border area is visible */
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
+          mask-composite: exclude;
   /* Ensure the border sits behind the pill content */
   z-index: -1;
   pointer-events: none;
@@ -178,9 +181,10 @@ body {
   top: calc(50% + 32.5px + 24px);
   left: calc(50% - 480px);
   border-radius: 28px;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(25px) saturate(200%) brightness(1.4);
-  -webkit-backdrop-filter: blur(25px) saturate(200%) brightness(1.4);
+  /* Dark blur for the results panel */
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(30px) saturate(180%) brightness(0.8);
+  -webkit-backdrop-filter: blur(30px) saturate(180%) brightness(0.8);
   overflow: hidden;
   isolation: isolate;
   /* Transparent border with background clipping to avoid dark outline */
@@ -201,27 +205,21 @@ body {
   animation: pillBorder 4s linear infinite;
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
+          mask-composite: exclude;
   z-index: -1;
   pointer-events: none;
 }
 
 /* Grid layout for the results cards */
-
-.results-window {
-   width: 960px;
-   height: 540px;
-   position: absolute;
-   top: calc(50% + 32.5px + 24px);
-   left: calc(50% - 480px);
-   border-radius: 28px;
-   overflow: hidden;
-   isolation: isolate;
-   border: 2px solid transparent;
-   background-clip: padding-box;
-   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.3);
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 200px);
+  grid-template-rows: repeat(2, 200px);
+  gap: 28px 24px;
+  padding: 32px;
+  justify-content: center;
 }
+
 .video-card {
   width: 200px;
   height: 200px;

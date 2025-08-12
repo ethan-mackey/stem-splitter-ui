@@ -2,62 +2,52 @@ import React, { useLayoutEffect, useRef, useState } from "react";
 
 /**
  * VibrancyMask
- * - Covers the entire window with an opaque plate.
- * - Cuts a rounded-rect "hole" where your pill lives.
- * - The hole can be inset slightly to prevent any blur bleed.
+ *
+ * This component overlays an opaque plate over the entire window and cuts a
+ * rounded‑rect hole where your pill or results panel lives. The hole
+ * reveals the OS vibrancy (blur) behind the window, while the plate hides
+ * it elsewhere. You can adjust the inset to shrink the cutout and hide
+ * any blur bleeding at the edges of your gradient border.
  *
  * Props:
- *   targetSelector  CSS selector for the pill element (default ".pill-window")
- *   radius          Corner radius of the pill in px (default 39)
- *   inset           Shrinks the hole on all sides by this many px to avoid edge bleed (default 2)
- *   overlayColor    Color outside the pill (default "#0d0d0d" opaque)
- *   zIndex          Stacking order (default 2147483000)
+ *   targetSelector  CSS selector for the element to reveal (e.g. ".pill-window")
+ *   radius          Corner radius of the target element (in px)
+ *   inset           Extra padding to shrink the cutout and avoid blur bleed
+ *   overlayColor    Colour outside the cutout; use a semi‑transparent dark tint
+ *   zIndex          Stacking order relative to your app content
  */
 export default function VibrancyMask({
   targetSelector = ".pill-window",
   radius = 39,
   inset = 2,
-  overlayColor = "#0d0d0d", // opaque to fully hide vibrancy outside the pill
-  zIndex = 2147483000,
+  overlayColor = "rgba(13,13,13,0.7)",
+  zIndex = 0,
 }) {
-  const svgRef = useRef(null);
-  const [dims, setDims] = useState({
-    vw: typeof window !== "undefined" ? window.innerWidth : 0,
-    vh: typeof window !== "undefined" ? window.innerHeight : 0,
-  });
+  const [dims, setDims] = useState({ vw: 0, vh: 0 });
   const [cut, setCut] = useState({ x: 0, y: 0, w: 0, h: 0, r: radius });
 
-  // Measure pill and keep in sync
+  // Measure target element and update cutout dimensions on resize/scroll/mutation
   useLayoutEffect(() => {
-    const el = () => document.querySelector(targetSelector);
-
     const update = () => {
-      const pill = el();
+      const el = document.querySelector(targetSelector);
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       setDims({ vw, vh });
-
-      if (!pill) return;
-
-      const b = pill.getBoundingClientRect();
-
-      // Shrink hole slightly to ensure no blur bleeds past border radius/gradient stroke
-      const ix = Math.max(0, inset);
+      if (!el) return;
+      const b = el.getBoundingClientRect();
+      const pad = Math.max(0, inset);
       setCut({
-        x: Math.round(b.x + ix),
-        y: Math.round(b.y + ix),
-        w: Math.max(0, Math.round(b.width - ix * 2)),
-        h: Math.max(0, Math.round(b.height - ix * 2)),
-        r: Math.max(0, radius - ix),
+        x: Math.round(b.x + pad),
+        y: Math.round(b.y + pad),
+        w: Math.max(0, Math.round(b.width - pad * 2)),
+        h: Math.max(0, Math.round(b.height - pad * 2)),
+        r: Math.max(0, radius - pad),
       });
     };
-
     update();
-
     const ro = new ResizeObserver(update);
-    const mo = new MutationObserver(update);
-
     ro.observe(document.documentElement);
+    const mo = new MutationObserver(update);
     mo.observe(document.body, {
       attributes: true,
       childList: true,
@@ -65,7 +55,6 @@ export default function VibrancyMask({
     });
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, true);
-
     return () => {
       ro.disconnect();
       mo.disconnect();
@@ -76,7 +65,6 @@ export default function VibrancyMask({
 
   return (
     <svg
-      ref={svgRef}
       className="vibrancy-mask"
       width={dims.vw}
       height={dims.vh}
@@ -84,16 +72,14 @@ export default function VibrancyMask({
       style={{
         position: "fixed",
         inset: 0,
-        // Put it ABOVE your UI; pointerEvents none so it doesn't block clicks.
         zIndex,
         pointerEvents: "none",
-        // Avoid subpixel fuzz on edges
         shapeRendering: "crispEdges",
       }}
     >
       <defs>
         <mask id="vmask" maskUnits="userSpaceOnUse">
-          {/* White = show overlay. Black = cutout (reveal OS vibrancy). */}
+          {/* White shows overlay; black cuts hole for the target */}
           <rect x="0" y="0" width={dims.vw} height={dims.vh} fill="white" />
           <rect
             x={cut.x}
@@ -106,8 +92,7 @@ export default function VibrancyMask({
           />
         </mask>
       </defs>
-
-      {/* Opaque plate that hides vibrancy everywhere except the pill hole */}
+      {/* Opaque plate covers blur outside the cutout */}
       <rect
         x="0"
         y="0"
