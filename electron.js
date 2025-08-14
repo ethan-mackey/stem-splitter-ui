@@ -50,10 +50,8 @@ function createWindow() {
     backgroundColor: "#00000000",
     // On macOS we can pass vibrancy and visualEffectState up-front. This
     // ensures that the vibrancy is applied as soon as the window is shown.
-    ...(isMac && {
-      vibrancy: "under-window",
-      visualEffectState: "active",
-    }),
+    // Do not enable system vibrancy here; the renderer uses CSS backdrop-filter
+    // for the frosted glass effect. The window remains transparent.
     webPreferences: {
       preload: path.join(__dirname, "preload.js"), // expose APIs to renderer
       contextIsolation: true,
@@ -65,25 +63,7 @@ function createWindow() {
   // After the window is created, we can call the platform specific APIs to
   // fine‑tune the blur effect. The try/catch blocks guard against
   // unsupported Electron versions or OS builds.
-  if (isMac) {
-    // setVibrancy can throw if the OS or Electron version does not support
-    // the requested material. Wrap in try/catch for graceful fallback.
-    try {
-      win.setVibrancy("under-window");
-    } catch (err) {
-      console.warn("Unable to set vibrancy:", err);
-    }
-  } else if (isWin) {
-    // setBackgroundMaterial is only available on Windows 11 22H2 or later.
-    // Check that the method exists before calling it.
-    if (typeof win.setBackgroundMaterial === "function") {
-      try {
-        win.setBackgroundMaterial("acrylic");
-      } catch (err) {
-        console.warn("Unable to set background material:", err);
-      }
-    }
-  }
+  // We intentionally do not call setVibrancy or setBackgroundMaterial here.
 
   // Determine which URL to load based on whether we're in dev mode or
   // production. If running via `npm start` or `react-scripts`, the
