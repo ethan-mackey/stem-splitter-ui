@@ -17,7 +17,7 @@ let win;
 const PILL_W = 800;
 const PILL_H = 65;
 const RESULTS_W = 960;
-const RESULTS_H = 540;
+const RESULTS_H = 438;
 const DASH_W = 1900;
 const DASH_H = 1200;
 const GAP = 24;
@@ -37,13 +37,13 @@ function createWindow() {
 
   win = new BrowserWindow({
     width: PILL_W,
-    height: PILL_H,
+    height: 150,
     minWidth: PILL_W,
-    minHeight: PILL_H,
-    useContentSize: true,
+    minHeight: 150,
+    useContentSize: false,
     frame: false,
     transparent: true,
-    resizable: false,
+    resizable: true,
     show: true,
     // Set the background color to fully transparent. Without this the OS
     // default window background may be visible through the vibrancy layer.
@@ -57,6 +57,8 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      webSecurity: false, // Allow local resources
+      zoomFactor: 1.0, // Ensure no scaling
     },
   });
 
@@ -100,22 +102,29 @@ app.on("window-all-closed", () => {
 ipcMain.on("results-opened", (_evt, { height }) => {
   let width, windowHeight;
   if (height === RESULTS_H) {
-    // Search results panel
-    width = RESULTS_W;
-    windowHeight = Math.max(RESULTS_H + 100, 800); // Ensure minimum window size
+    // Search results panel - make it larger to ensure everything fits
+    width = 1020; // Increased to give extra buffer space
+    windowHeight = 850; // Increased height to ensure no cutoff
   } else if (height === DASH_H) {
     // Dashboard view
     width = DASH_W;
-    windowHeight = DASH_H + 100; // Add some padding
+    windowHeight = DASH_H;
   } else {
     // Fallback to pill size
     width = PILL_W;
-    windowHeight = PILL_H + 100;
+    windowHeight = 150; // Enough height for search bar
   }
+  console.log(`Setting window size to: ${width}x${windowHeight}`);
   win?.setSize(width, windowHeight);
+  
+  // Log actual size after setting
+  setTimeout(() => {
+    const actualSize = win?.getSize();
+    console.log(`Actual window size: ${actualSize?.[0]}x${actualSize?.[1]}`);
+  }, 100);
 });
 ipcMain.on("results-closed", () => {
-  win?.setSize(PILL_W, PILL_H + 50); // Small padding for pill only
+  win?.setSize(PILL_W, 150); // Ensure enough height for search bar
 });
 
 // Helper to download the highest-quality audio stream for a given videoId

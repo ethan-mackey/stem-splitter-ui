@@ -8,7 +8,7 @@ import "./App.css";
 
 // Rotating helper messages for the search bar
 const messages = ["Type in a search", "Paste a link", "Drop in a file"];
-const PANEL_HEIGHT = 540;
+const PANEL_HEIGHT = 478;
 const DASHBOARD_HEIGHT = 1200;
 
 export default function App() {
