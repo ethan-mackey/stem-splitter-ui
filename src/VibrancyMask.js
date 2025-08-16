@@ -1,21 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from "react";
 
-/**
- * VibrancyMask
- *
- * This component overlays an opaque plate over the entire window and cuts a
- * rounded‑rect hole where your pill or results panel lives. The hole
- * reveals the OS vibrancy (blur) behind the window, while the plate hides
- * it elsewhere. You can adjust the inset to shrink the cutout and hide
- * any blur bleeding at the edges of your gradient border.
- *
- * Props:
- *   targetSelector  CSS selector for the element to reveal (e.g. ".pill-window")
- *   radius          Corner radius of the target element (in px)
- *   inset           Extra padding to shrink the cutout and avoid blur bleed
- *   overlayColor    Colour outside the cutout; use a semi‑transparent dark tint
- *   zIndex          Stacking order relative to your app content
- */
 export default function VibrancyMask({
   targetSelector = ".pill-window",
   radius = 39,
@@ -26,7 +10,6 @@ export default function VibrancyMask({
   const [dims, setDims] = useState({ vw: 0, vh: 0 });
   const [cut, setCut] = useState({ x: 0, y: 0, w: 0, h: 0, r: radius });
 
-  // Measure target element and update cutout dimensions on resize/scroll/mutation
   useLayoutEffect(() => {
     const update = () => {
       const el = document.querySelector(targetSelector);
@@ -79,7 +62,6 @@ export default function VibrancyMask({
     >
       <defs>
         <mask id="vmask" maskUnits="userSpaceOnUse">
-          {/* White shows overlay; black cuts hole for the target */}
           <rect x="0" y="0" width={dims.vw} height={dims.vh} fill="white" />
           <rect
             x={cut.x}
@@ -92,7 +74,7 @@ export default function VibrancyMask({
           />
         </mask>
       </defs>
-      {/* Opaque plate covers blur outside the cutout */}
+
       <rect
         x="0"
         y="0"

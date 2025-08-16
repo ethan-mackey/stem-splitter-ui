@@ -2,18 +2,6 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import WaveSurfer from "wavesurfer.js";
 import "./App.css";
 
-/**
- * Waveform component for rendering an audio waveform using WaveSurfer.js.
- *
- * Props:
- *  - progress: number 0..1 (from YouTube player)
- *  - duration: number seconds (YouTube duration; used by loop UI)
- *  - loop: {a:number,b:number}|null (loop start/end times in seconds)
- *  - onScrub(ratio 0..1): called when user scrubs the waveform; pass ratio to parent
- *  - onLoopChange(newLoop): called when loop markers are moved
- *  - videoId: string (YouTube ID)
- *  - onAudioLoaded?: (blob: Blob) => void  // called when a WAV blob is ready
- */
 export default function Waveform({
   progress = 0,
   duration = 0,
@@ -30,13 +18,11 @@ export default function Waveform({
   const [dragType, setDragType] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
-  const [wsDuration, setWsDuration] = useState(0); // WaveSurfer’s true duration
+  const [wsDuration, setWsDuration] = useState(0);
 
-  // refs to hold latest callback references
   const onScrubRef = useRef(onScrub);
   const onAudioLoadedRef = useRef(onAudioLoaded);
 
-  // Update callback refs on prop changes
   useEffect(() => {
     onScrubRef.current = onScrub;
   }, [onScrub]);
@@ -44,9 +30,7 @@ export default function Waveform({
     onAudioLoadedRef.current = onAudioLoaded;
   }, [onAudioLoaded]);
 
-  // Instantiate the WaveSurfer instance once when the component mounts
   useEffect(() => {
-    // Only create a new instance if the container is ready and no instance exists
     if (!containerRef.current || wsRef.current) return;
     try {
       const ws = WaveSurfer.create({
@@ -54,19 +38,18 @@ export default function Waveform({
         waveColor: "#ff0a9c",
         progressColor: "#ff1aac",
         height: 180,
-        normalize: false, // preserve original amplitudes
+        normalize: false,
         interact: true,
         dragToSeek: true,
         partialRender: true,
-        // Bars rendering options (see wavesurfer.js bars example)
+
         barWidth: 3,
         barGap: 1,
         barRadius: 3,
-        barHeight: 1, // fill full height of the waveform
+        barHeight: 1,
       });
 
       ws.on("ready", () => {
-        // Save duration once the audio is ready
         setWsDuration(ws.getDuration() || 0);
         setLoadError(null);
       });
@@ -75,7 +58,6 @@ export default function Waveform({
         setLoadError("Waveform render error.");
       });
       ws.on("seek", (ratio) => {
-        // propagate seek events to parent
         onScrubRef.current?.(ratio);
       });
 
@@ -85,21 +67,17 @@ export default function Waveform({
       setLoadError("Audio renderer failed to initialize.");
     }
 
-    // cleanup on unmount
     return () => {
       if (wsRef.current) {
         try {
           wsRef.current.destroy();
-        } catch {
-          /* ignore cleanup errors */
-        }
+        } catch {}
         wsRef.current = null;
       }
       setWsDuration(0);
     };
   }, []);
 
-  // Download and load audio when the videoId changes
   useEffect(() => {
     let cancelled = false;
     const ws = wsRef.current;
@@ -109,7 +87,7 @@ export default function Waveform({
       setIsLoading(true);
       setLoadError(null);
       console.log("Loading waveform for video:", videoId);
-      // If Electron API is available, use it to download audio into a Blob.
+
       if (window.audioAPI?.downloadAudioForVideo) {
         try {
           const { mime, data } = await window.audioAPI.downloadAudioForVideo(
@@ -133,7 +111,7 @@ export default function Waveform({
           return;
         }
       }
-      // If no Electron API is present, inform the user rather than attempting a remote download
+
       setLoadError(
         "The desktop audio API is not available in this environment. Please run the application via Electron (npm run electron-dev or packaged build) so that audio can be downloaded locally."
       );
@@ -146,7 +124,6 @@ export default function Waveform({
     };
   }, [videoId]);
 
-  // Sync the waveform playback cursor to the YouTube player's progress
   useEffect(() => {
     const ws = wsRef.current;
     if (!ws || !wsDuration || isDragging) return;
@@ -157,7 +134,6 @@ export default function Waveform({
     }
   }, [progress, wsDuration, isDragging]);
 
-  // Utility to convert mouse X coordinate into a ratio (0..1) across the waveform
   const toRatio = useCallback((clientX) => {
     const box = containerRef.current?.getBoundingClientRect();
     if (!box) return 0;
@@ -165,7 +141,6 @@ export default function Waveform({
     return x / box.width;
   }, []);
 
-  // Handle mouse down events for scrubbing and loop handle dragging
   const handleMouseDown = useCallback(
     (e, type) => {
       e.preventDefault();
@@ -179,7 +154,6 @@ export default function Waveform({
     [onScrub, toRatio]
   );
 
-  // Handle mouse move events while dragging
   const handleMouseMove = useCallback(
     (e) => {
       if (!isDragging) return;
@@ -196,13 +170,11 @@ export default function Waveform({
     [isDragging, dragType, toRatio, duration, loop, onScrub, onLoopChange]
   );
 
-  // Handle mouse up events to end dragging
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
     setDragType(null);
   }, []);
 
-  // Compute loop positions as ratios of the total duration
   const startPos = (loop?.a ?? 0) / (duration || 1);
   const endPos = (loop?.b ?? duration ?? 1) / (duration || 1);
 
@@ -214,7 +186,6 @@ export default function Waveform({
       onMouseLeave={handleMouseUp}
       style={{ position: "relative" }}
     >
-      {/* The waveform container for WaveSurfer */}
       <div
         ref={containerRef}
         style={{
@@ -231,7 +202,6 @@ export default function Waveform({
         onMouseDown={(e) => handleMouseDown(e, "scrub")}
       />
 
-      {/* Loading indicator */}
       {isLoading && (
         <div
           style={{
@@ -250,7 +220,6 @@ export default function Waveform({
         </div>
       )}
 
-      {/* Error indicator */}
       {loadError && (
         <div
           style={{
@@ -274,7 +243,6 @@ export default function Waveform({
         </div>
       )}
 
-      {/* Loop highlight */}
       {loop && duration > 0 && (
         <div
           style={{
@@ -290,7 +258,6 @@ export default function Waveform({
         />
       )}
 
-      {/* Loop start handle */}
       <div
         className="waveform-clip-handle start"
         style={{ left: `${startPos * 100}%` }}
@@ -298,7 +265,7 @@ export default function Waveform({
       >
         <div className="clip-handle-cap" />
       </div>
-      {/* Loop end handle */}
+
       <div
         className="waveform-clip-handle end"
         style={{ left: `${endPos * 100}%` }}
